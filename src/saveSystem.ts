@@ -15,6 +15,7 @@ export type GameSaveData = {
   profile: {
     gold: number;
     unlockedCharacters: string[];
+    selectedCharacter: string;
     weapons: Record<string, unknown>;
     achievements: string[];
     settings: Record<string, unknown>;
@@ -39,7 +40,8 @@ export function createDefaultSaveData(): GameSaveData {
     lastRun: null,
     profile: {
       gold: 0,
-      unlockedCharacters: ['wanderer'],
+      unlockedCharacters: ['caiden'],
+      selectedCharacter: 'caiden',
       weapons: {},
       achievements: [],
       settings: {},
@@ -63,6 +65,7 @@ export function normalizeSaveData(raw: unknown): GameSaveData {
     profile: {
       ...fallback.profile,
       ...(data.profile || {}),
+      unlockedCharacters: data.profile?.unlockedCharacters?.length ? data.profile.unlockedCharacters : fallback.profile.unlockedCharacters,
     },
     future: {
       ...fallback.future,

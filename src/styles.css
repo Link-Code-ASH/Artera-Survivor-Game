@@ -289,6 +289,77 @@ input {
   backdrop-filter: blur(6px);
 }
 
+.character-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(6, 10, 7, 0.68);
+  backdrop-filter: blur(8px);
+}
+
+.character-panel {
+  display: grid;
+  width: min(760px, 100%);
+  gap: 16px;
+}
+
+.character-panel h2 {
+  margin: 0;
+  color: #fff6df;
+  text-align: center;
+  font-size: clamp(28px, 4vw, 42px);
+}
+
+.character-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.character-list button {
+  display: grid;
+  gap: 9px;
+  min-height: 220px;
+  padding: 18px;
+  place-items: center;
+  border: 1px solid rgba(248, 220, 134, 0.24);
+  border-radius: 8px;
+  background: rgba(33, 38, 26, 0.94);
+  cursor: pointer;
+  text-align: center;
+}
+
+.character-list button:hover {
+  border-color: rgba(255, 224, 131, 0.78);
+  background: rgba(49, 52, 32, 0.98);
+}
+
+.character-portrait {
+  display: grid;
+  width: 84px;
+  height: 84px;
+  place-items: center;
+  border: 2px solid rgba(248, 220, 134, 0.52);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 30%, #5168a4, #233963 72%);
+  color: #fff6df;
+  font-size: 36px;
+  font-weight: 900;
+}
+
+.character-list strong {
+  color: #ffe083;
+  font-size: 22px;
+}
+
+.character-list span:last-child {
+  color: rgba(255, 246, 223, 0.76);
+  line-height: 1.45;
+}
+
 .upgrade-panel {
   width: min(720px, 100%);
 }

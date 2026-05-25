@@ -27,6 +27,13 @@ type Upgrade = {
   apply: (game: GameState) => void;
 };
 
+type CharacterDefinition = {
+  id: string;
+  name: string;
+  description: string;
+  damageTakenMultiplier: number;
+};
+
 type GameState = {
   status: 'ready' | 'running' | 'paused' | 'levelup' | 'gameover';
   width: number;
@@ -42,6 +49,7 @@ type GameState = {
     hp: number;
     maxHp: number;
     speed: number;
+    damageTakenMultiplier: number;
     xp: number;
     nextXp: number;
     level: number;
@@ -61,6 +69,15 @@ type GameState = {
 const keys = new Set<string>();
 const pointerMove: Vec = { x: 0, y: 0 };
 let pointerActive = false;
+
+const characters: CharacterDefinition[] = [
+  {
+    id: 'caiden',
+    name: '케이든',
+    description: '방어력이 30% 증가합니다.',
+    damageTakenMultiplier: 0.7,
+  },
+];
 
 const upgrades: Upgrade[] = [
   {
@@ -114,7 +131,8 @@ const upgrades: Upgrade[] = [
   },
 ];
 
-function newGame(width = 960, height = 540): GameState {
+function newGame(width = 960, height = 540, character: CharacterDefinition = characters[0]): GameState {
+  const baseSpeed = 190;
   return {
     status: 'ready',
     width,
@@ -134,7 +152,8 @@ function newGame(width = 960, height = 540): GameState {
       r: 16,
       hp: 100,
       maxHp: 100,
-      speed: 190,
+      speed: baseSpeed,
+      damageTakenMultiplier: character.damageTakenMultiplier,
       xp: 0,
       nextXp: 18,
       level: 1,
@@ -287,7 +306,7 @@ function updateGame(game: GameState, dt: number) {
     enemy.x += toPlayer.x * enemy.speed * dt;
     enemy.y += toPlayer.y * enemy.speed * dt;
     if (Math.hypot(enemy.x - game.player.x, enemy.y - game.player.y) < enemy.r + game.player.r) {
-      game.player.hp -= (12 + game.time * 0.12) * dt;
+      game.player.hp -= (12 + game.time * 0.12) * dt * game.player.damageTakenMultiplier;
       enemy.x -= toPlayer.x * 18 * dt;
       enemy.y -= toPlayer.y * 18 * dt;
     }
@@ -561,20 +580,24 @@ type SaveSession = {
 
 function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; onSignOut: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const gameRef = useRef<GameState>(newGame());
+  const selectedCharacterId = saveSession?.initialSaveData.profile.selectedCharacter || characters[0].id;
+  const initialCharacter = characters.find((character) => character.id === selectedCharacterId) || characters[0];
+  const gameRef = useRef<GameState>(newGame(960, 540, initialCharacter));
   const frameRef = useRef(0);
   const lastRef = useRef(0);
   const savedGameOverRef = useRef(false);
   const [snapshot, setSnapshot] = useState(gameRef.current);
   const [saveData, setSaveData] = useState<GameSaveData>(saveSession?.initialSaveData || createDefaultSaveData());
   const [saveMessage, setSaveMessage] = useState(saveSession ? 'Cloud save ready' : 'Local test mode');
+  const [selectedCharacter, setSelectedCharacter] = useState<CharacterDefinition>(initialCharacter);
+  const [characterSelected, setCharacterSelected] = useState(false);
 
   const syncSnapshot = () => setSnapshot({ ...gameRef.current, player: { ...gameRef.current.player } });
 
   const start = () => {
     requestFullScreen();
     if (gameRef.current.status === 'gameover') {
-      gameRef.current = newGame(gameRef.current.width, gameRef.current.height);
+      gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter);
       savedGameOverRef.current = false;
     }
     gameRef.current.status = 'running';
@@ -582,7 +605,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   };
 
   const reset = () => {
-    gameRef.current = newGame(gameRef.current.width, gameRef.current.height);
+    gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter);
     savedGameOverRef.current = false;
     syncSnapshot();
   };
@@ -666,6 +689,28 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
     upgrade.apply(game);
     game.upgrades = [];
     game.status = 'running';
+    syncSnapshot();
+  };
+
+  const chooseCharacter = (character: CharacterDefinition) => {
+    setSelectedCharacter(character);
+    const nextSaveData = {
+      ...saveData,
+      profile: {
+        ...saveData.profile,
+        selectedCharacter: character.id,
+      },
+    };
+    setSaveData(nextSaveData);
+    if (saveSession) {
+      setSaveMessage('Saving character...');
+      saveGameSave(saveSession.client, saveSession.credentials, nextSaveData)
+        .then(() => setSaveMessage('Character saved'))
+        .catch(() => setSaveMessage('Character save failed'));
+    }
+    gameRef.current = newGame(gameRef.current.width, gameRef.current.height, character);
+    savedGameOverRef.current = false;
+    setCharacterSelected(true);
     syncSnapshot();
   };
 
@@ -754,6 +799,23 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
                   <button key={upgrade.id} onClick={() => chooseUpgrade(upgrade)}>
                     <strong>{upgrade.title}</strong>
                     <span>{upgrade.body}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!characterSelected && (
+          <div className="character-layer">
+            <div className="character-panel">
+              <h2>캐릭터 선택</h2>
+              <div className="character-list">
+                {characters.map((character) => (
+                  <button key={character.id} onClick={() => chooseCharacter(character)}>
+                    <span className="character-portrait">{character.name.slice(0, 1)}</span>
+                    <strong>{character.name}</strong>
+                    <span>{character.description}</span>
                   </button>
                 ))}
               </div>
