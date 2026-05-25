@@ -296,7 +296,10 @@ input {
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(6, 10, 7, 0.68);
+  background:
+    radial-gradient(circle at 50% 26%, rgba(248, 220, 134, 0.14), transparent 26%),
+    linear-gradient(180deg, rgba(9, 13, 8, 0.5), rgba(4, 7, 5, 0.86)),
+    rgba(6, 10, 7, 0.68);
   backdrop-filter: blur(8px);
 }
 
@@ -304,6 +307,13 @@ input {
   display: grid;
   width: min(760px, 100%);
   gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(248, 220, 134, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(58, 47, 30, 0.58), rgba(22, 34, 22, 0.74)),
+    rgba(16, 20, 14, 0.72);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.42);
 }
 
 .character-panel h2 {
@@ -325,11 +335,24 @@ input {
   min-height: 220px;
   padding: 18px;
   place-items: center;
-  border: 1px solid rgba(248, 220, 134, 0.24);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(248, 220, 134, 0.28);
   border-radius: 8px;
-  background: rgba(33, 38, 26, 0.94);
+  background:
+    linear-gradient(180deg, rgba(91, 72, 42, 0.34), transparent 48%),
+    rgba(33, 38, 26, 0.94);
   cursor: pointer;
   text-align: center;
+}
+
+.character-list button::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 1px solid rgba(255, 246, 223, 0.08);
+  border-radius: 6px;
+  pointer-events: none;
 }
 
 .character-list button:hover {
@@ -339,15 +362,27 @@ input {
 
 .character-portrait {
   display: grid;
-  width: 84px;
-  height: 84px;
+  width: 112px;
+  height: 112px;
   place-items: center;
+  overflow: hidden;
   border: 2px solid rgba(248, 220, 134, 0.52);
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 30%, #5168a4, #233963 72%);
+  background: transparent;
   color: #fff6df;
   font-size: 36px;
   font-weight: 900;
+  box-shadow:
+    0 0 0 8px rgba(248, 220, 134, 0.08),
+    0 12px 26px rgba(0, 0, 0, 0.28);
+}
+
+.character-portrait img {
+  width: 230px;
+  height: 230px;
+  object-fit: contain;
+  transform: translate(-62px, -18px);
+  image-rendering: auto;
 }
 
 .character-list strong {

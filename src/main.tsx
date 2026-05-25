@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { LogOut, Maximize, Pause, Play, RotateCcw } from 'lucide-react';
@@ -35,6 +35,8 @@ type CharacterDefinition = {
   damageTakenMultiplier: number;
 };
 
+type Direction = 'down' | 'left' | 'right' | 'up';
+
 type GameState = {
   status: 'ready' | 'running' | 'paused' | 'levelup' | 'gameover';
   width: number;
@@ -51,6 +53,9 @@ type GameState = {
     maxHp: number;
     speed: number;
     damageTakenMultiplier: number;
+    facing: Direction;
+    moving: boolean;
+    attackTimer: number;
     xp: number;
     nextXp: number;
     level: number;
@@ -70,6 +75,7 @@ type GameState = {
 const keys = new Set<string>();
 const pointerMove: Vec = { x: 0, y: 0 };
 let pointerActive = false;
+let lastMoveDirection: Direction = 'down';
 
 const characters: CharacterDefinition[] = [
   {
@@ -79,6 +85,21 @@ const characters: CharacterDefinition[] = [
     damageTakenMultiplier: 0.7,
   },
 ];
+
+const caidenAtlas = new Image();
+caidenAtlas.src = 'assets/images/characters/caiden-4dir.png';
+const caidenPortrait = new Image();
+caidenPortrait.src = 'assets/images/characters/caiden-portrait.png';
+
+function characterName(character: CharacterDefinition) {
+  if (character.id === 'caiden') return '케이든';
+  return character.name;
+}
+
+function characterDescription(character: CharacterDefinition) {
+  if (character.id === 'caiden') return '방어력이 30% 증가합니다.';
+  return character.description;
+}
 
 const upgrades: Upgrade[] = [
   {
@@ -155,6 +176,9 @@ function newGame(width = 960, height = 540, character: CharacterDefinition = cha
       maxHp: 100,
       speed: baseSpeed,
       damageTakenMultiplier: character.damageTakenMultiplier,
+      facing: 'right',
+      moving: false,
+      attackTimer: 0,
       xp: 0,
       nextXp: 18,
       level: 1,
@@ -241,6 +265,7 @@ function shoot(game: GameState) {
   const target = nearestEnemy(game);
   if (!target) return;
   playSound('shoot');
+  game.player.attackTimer = 0.22;
   const base = Math.atan2(target.y - game.player.y, target.x - game.player.x);
   const count = game.player.projectiles;
   const spread = count === 1 ? 0 : 0.22;
@@ -274,13 +299,25 @@ function inputVector(): Vec {
   const v = { x: 0, y: 0 };
   if (keys.has('KeyW') || keys.has('ArrowUp')) v.y -= 1;
   if (keys.has('KeyS') || keys.has('ArrowDown')) v.y += 1;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) v.x -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) v.x += 1;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) {
+    v.x -= 1;
+  }
+  if (keys.has('KeyD') || keys.has('ArrowRight')) {
+    v.x += 1;
+  }
   if (pointerActive) {
     v.x += pointerMove.x;
     v.y += pointerMove.y;
   }
-  return len(v) > 1 ? norm(v) : v;
+  const next = len(v) > 1 ? norm(v) : v;
+  if (Math.abs(next.x) > 0.04 || Math.abs(next.y) > 0.04) {
+    if (Math.abs(next.x) > Math.abs(next.y)) {
+      lastMoveDirection = next.x < 0 ? 'left' : 'right';
+    } else {
+      lastMoveDirection = next.y < 0 ? 'up' : 'down';
+    }
+  }
+  return next;
 }
 
 function updateGame(game: GameState, dt: number) {
@@ -288,6 +325,9 @@ function updateGame(game: GameState, dt: number) {
   game.time += dt;
 
   const move = inputVector();
+  game.player.moving = Math.abs(move.x) > 0.04 || Math.abs(move.y) > 0.04;
+  game.player.facing = lastMoveDirection;
+  game.player.attackTimer = Math.max(0, game.player.attackTimer - dt);
   game.player.x += move.x * game.player.speed * dt;
   game.player.y += move.y * game.player.speed * dt;
 
@@ -393,7 +433,7 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
   ctx.restore();
 
   if (game.status === 'ready') {
-    drawCenterMessage(ctx, game, 'ARTERA SURVIVOR', '시작하면 숲 외곽의 침입자들이 몰려옵니다');
+    drawCenterMessage(ctx, game, 'ARTERA SURVIVOR', '캐릭터를 선택하면 숲 외곽의 침입자들이 몰려옵니다');
   }
   if (game.status === 'paused') {
     drawCenterMessage(ctx, game, 'PAUSED', '성소의 숨결이 잠시 멈췄습니다');
@@ -410,6 +450,37 @@ function drawMap(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
   bg.addColorStop(1, '#1f3022');
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, game.width, game.height);
+
+  const patchCell = 180;
+  const patchStartX = Math.floor(camera.x / patchCell) * patchCell - patchCell;
+  const patchStartY = Math.floor(camera.y / patchCell) * patchCell - patchCell;
+  for (let wx = patchStartX; wx < camera.x + game.width + patchCell; wx += patchCell) {
+    for (let wy = patchStartY; wy < camera.y + game.height + patchCell; wy += patchCell) {
+      const seed = seededNoise(wx + 41, wy + 73);
+      const px = wx + seededNoise(wx + 7, wy) * patchCell - camera.x;
+      const py = wy + seededNoise(wx, wy + 13) * patchCell - camera.y;
+      if (seed < 0.34) {
+        ctx.fillStyle = 'rgba(58, 91, 42, 0.26)';
+        ctx.beginPath();
+        ctx.ellipse(px, py, 58 + seed * 44, 24 + seed * 26, seed * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (seed > 0.88) {
+        ctx.fillStyle = 'rgba(166, 153, 112, 0.22)';
+        ctx.beginPath();
+        ctx.arc(px, py, 6 + seed * 7, 0, Math.PI * 2);
+        ctx.arc(px + 18, py - 4, 4 + seed * 5, 0, Math.PI * 2);
+        ctx.arc(px - 14, py + 7, 3 + seed * 4, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (seed > 0.78) {
+        ctx.fillStyle = 'rgba(137, 194, 133, 0.26)';
+        for (let i = 0; i < 5; i += 1) {
+          ctx.beginPath();
+          ctx.arc(px + i * 9 - 18, py + Math.sin(i) * 7, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
 
   ctx.strokeStyle = 'rgba(222, 196, 128, 0.13)';
   ctx.lineWidth = 34;
@@ -454,6 +525,16 @@ function drawMap(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
         drawRuin(ctx, px, py);
       }
     }
+  }
+
+  ctx.strokeStyle = 'rgba(255, 246, 223, 0.08)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i += 1) {
+    const y = ((camera.y * -0.04 + i * 170) % (game.height + 180)) - 90;
+    ctx.beginPath();
+    ctx.moveTo(-40, y);
+    ctx.bezierCurveTo(game.width * 0.24, y - 30, game.width * 0.52, y + 24, game.width + 40, y - 12);
+    ctx.stroke();
   }
 }
 
@@ -529,6 +610,45 @@ function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy) {
 
 function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
   const p = game.player;
+  if (caidenAtlas.complete && caidenAtlas.naturalWidth > 0) {
+    const frameSize = caidenAtlas.naturalWidth / 4;
+    const frame = p.moving ? Math.floor(game.time * 8) % 4 : 0;
+    const rowByDirection: Record<Direction, number> = {
+      down: 0,
+      left: 1,
+      right: 1,
+      up: 3,
+    };
+    const row = rowByDirection[p.facing];
+    const sourceX = Math.floor(frame * frameSize);
+    const upExtra = p.facing === 'up' ? 48 : 0;
+    const sourceY = Math.max(0, Math.floor(row * frameSize) - upExtra);
+    const sourceWidth = Math.ceil(frameSize);
+    const sourceHeight = Math.ceil(frameSize) + upExtra;
+    const drawWidth = 74;
+    const drawHeight = p.facing === 'up' ? 86 : 74;
+    const drawY = p.y - drawHeight * (p.facing === 'up' ? 0.48 : 0.68);
+
+    ctx.save();
+    ctx.translate(p.x, drawY);
+    if (p.facing === 'right') {
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(
+      caidenAtlas,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      -drawWidth / 2,
+      0,
+      drawWidth,
+      drawHeight,
+    );
+    ctx.restore();
+    return;
+  }
+
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
@@ -721,6 +841,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
     gameRef.current = newGame(gameRef.current.width, gameRef.current.height, character);
     savedGameOverRef.current = false;
     setCharacterSelected(true);
+    gameRef.current.status = 'running';
     syncSnapshot();
   };
 
@@ -823,9 +944,11 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
               <div className="character-list">
                 {characters.map((character) => (
                   <button key={character.id} onClick={() => chooseCharacter(character)}>
-                    <span className="character-portrait">{character.name.slice(0, 1)}</span>
-                    <strong>{character.name}</strong>
-                    <span>{character.description}</span>
+                    <span className="character-portrait">
+                      {character.id === 'caiden' ? <img src="assets/images/characters/caiden-portrait.png" alt="" /> : characterName(character).slice(0, 1)}
+                    </span>
+                    <strong>{characterName(character)}</strong>
+                    <span>{characterDescription(character)}</span>
                   </button>
                 ))}
               </div>
@@ -995,7 +1118,7 @@ function AuthGate() {
       <main className="auth-screen">
         <div className="auth-panel">
           <h1>Artera Survivor</h1>
-          <p>성소의 문을 여는 중입니다.</p>
+          <p>?깆냼??臾몄쓣 ?щ뒗 以묒엯?덈떎.</p>
         </div>
       </main>
     );
@@ -1102,3 +1225,4 @@ function AuthGate() {
 }
 
 createRoot(document.getElementById('root')!).render(<AuthGate />);
+
