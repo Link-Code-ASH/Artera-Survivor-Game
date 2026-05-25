@@ -11,7 +11,7 @@ import {
   type SyncCredentials,
   verifyGameSync,
 } from './saveSystem';
-import { playSound, unlockAudio } from './soundSystem';
+import { isAudioUnlocked, playSound, startTitleMusic, unlockAudio } from './soundSystem';
 import { createSupabaseClient, hasSupabaseConfig, supabase } from './supabaseClient';
 import './styles.css';
 
@@ -100,8 +100,8 @@ const characters: CharacterDefinition[] = [
   {
     id: 'caiden',
     name: '케이든',
-    description: '방어력이 30% 증가합니다.',
-    damageTakenMultiplier: 0.7,
+    description: '푸른 망토를 두른 아르테라의 젊은 수호자입니다.',
+    damageTakenMultiplier: 1,
   },
 ];
 
@@ -139,7 +139,7 @@ function characterName(character: CharacterDefinition) {
 }
 
 function characterDescription(character: CharacterDefinition) {
-  if (character.id === 'caiden') return '방어력이 30% 증가합니다.';
+  if (character.id === 'caiden') return '푸른 망토를 두른 아르테라의 젊은 수호자입니다.';
   return character.description;
 }
 
@@ -256,10 +256,27 @@ function norm(v: Vec): Vec {
   return { x: v.x / l, y: v.y / l };
 }
 
-function getCamera(game: GameState): Vec {
+function getCameraScale(game: GameState) {
+  const shortSide = Math.min(game.width, game.height);
+  if (shortSide <= 520) return 0.74;
+  if (shortSide <= 720) return 0.84;
+  return 1;
+}
+
+function getWorldView(game: GameState) {
+  const scale = getCameraScale(game);
   return {
-    x: game.player.x - game.width / 2,
-    y: game.player.y - game.height / 2,
+    scale,
+    width: game.width / scale,
+    height: game.height / scale,
+  };
+}
+
+function getCamera(game: GameState): Vec {
+  const view = getWorldView(game);
+  return {
+    x: game.player.x - view.width / 2,
+    y: game.player.y - view.height / 2,
   };
 }
 
@@ -282,21 +299,22 @@ function pickUpgrades(game: GameState) {
 
 function spawnEnemy(game: GameState) {
   const camera = getCamera(game);
+  const view = getWorldView(game);
   const margin = 90;
   const side = Math.floor(Math.random() * 4);
   const pos = { x: game.player.x, y: game.player.y };
   if (side === 0) {
     pos.x = camera.x - margin;
-    pos.y = camera.y + Math.random() * game.height;
+    pos.y = camera.y + Math.random() * view.height;
   } else if (side === 1) {
-    pos.x = camera.x + game.width + margin;
-    pos.y = camera.y + Math.random() * game.height;
+    pos.x = camera.x + view.width + margin;
+    pos.y = camera.y + Math.random() * view.height;
   } else if (side === 2) {
-    pos.x = camera.x + Math.random() * game.width;
+    pos.x = camera.x + Math.random() * view.width;
     pos.y = camera.y - margin;
   } else {
-    pos.x = camera.x + Math.random() * game.width;
-    pos.y = camera.y + game.height + margin;
+    pos.x = camera.x + Math.random() * view.width;
+    pos.y = camera.y + view.height + margin;
   }
   const minutes = game.time / 60;
   game.enemies.push({
@@ -476,6 +494,9 @@ function updateGame(game: GameState, dt: number) {
 function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
   ctx.clearRect(0, 0, game.width, game.height);
   const camera = getCamera(game);
+  const view = getWorldView(game);
+  ctx.save();
+  ctx.scale(view.scale, view.scale);
   drawMap(ctx, game, camera);
 
   ctx.save();
@@ -494,6 +515,7 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
     ctx.globalAlpha = 1;
   }
   ctx.restore();
+  ctx.restore();
 
   if (game.status === 'ready') {
     drawCenterMessage(ctx, game, 'ARTERA SURVIVOR', '캐릭터를 선택하면 숲 외곽의 침입자들이 몰려옵니다');
@@ -507,31 +529,33 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
 }
 
 function drawMap(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
+  const view = getWorldView(game);
   drawForestGround(ctx, game, camera);
   drawForestProps(ctx, game, camera);
 
   ctx.strokeStyle = 'rgba(255, 246, 223, 0.08)';
   ctx.lineWidth = 1;
   for (let i = 0; i < 3; i += 1) {
-    const y = ((camera.y * -0.04 + i * 170) % (game.height + 180)) - 90;
+    const y = ((camera.y * -0.04 + i * 170) % (view.height + 180)) - 90;
     ctx.beginPath();
     ctx.moveTo(-40, y);
-    ctx.bezierCurveTo(game.width * 0.24, y - 30, game.width * 0.52, y + 24, game.width + 40, y - 12);
+    ctx.bezierCurveTo(view.width * 0.24, y - 30, view.width * 0.52, y + 24, view.width + 40, y - 12);
     ctx.stroke();
   }
 }
 
 function drawForestGround(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
+  const view = getWorldView(game);
   ctx.fillStyle = '#24381f';
-  ctx.fillRect(0, 0, game.width, game.height);
+  ctx.fillRect(0, 0, view.width, view.height);
 
   if (!forestGroundTiles.complete || forestGroundTiles.naturalWidth <= 0) {
-    const bg = ctx.createLinearGradient(0, 0, game.width, game.height);
+    const bg = ctx.createLinearGradient(0, 0, view.width, view.height);
     bg.addColorStop(0, '#21371f');
     bg.addColorStop(0.5, '#334727');
     bg.addColorStop(1, '#1f3022');
     ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, game.width, game.height);
+    ctx.fillRect(0, 0, view.width, view.height);
     return;
   }
 
@@ -543,8 +567,8 @@ function drawForestGround(ctx: CanvasRenderingContext2D, game: GameState, camera
   const sourceInset = 5;
   const startTileX = Math.floor(camera.x / tileSize) - 1;
   const startTileY = Math.floor(camera.y / tileSize) - 1;
-  const endTileX = Math.ceil((camera.x + game.width) / tileSize) + 1;
-  const endTileY = Math.ceil((camera.y + game.height) / tileSize) + 1;
+  const endTileX = Math.ceil((camera.x + view.width) / tileSize) + 1;
+  const endTileY = Math.ceil((camera.y + view.height) / tileSize) + 1;
 
   for (let ty = startTileY; ty <= endTileY; ty += 1) {
     for (let tx = startTileX; tx <= endTileX; tx += 1) {
@@ -573,23 +597,24 @@ function drawForestGround(ctx: CanvasRenderingContext2D, game: GameState, camera
   }
 
   const shade = ctx.createRadialGradient(
-    game.width / 2,
-    game.height / 2,
-    Math.min(game.width, game.height) * 0.25,
-    game.width / 2,
-    game.height / 2,
-    Math.max(game.width, game.height) * 0.72,
+    view.width / 2,
+    view.height / 2,
+    Math.min(view.width, view.height) * 0.25,
+    view.width / 2,
+    view.height / 2,
+    Math.max(view.width, view.height) * 0.72,
   );
   shade.addColorStop(0, 'rgba(255, 255, 255, 0)');
   shade.addColorStop(1, 'rgba(9, 18, 12, 0.26)');
   ctx.fillStyle = shade;
-  ctx.fillRect(0, 0, game.width, game.height);
+  ctx.fillRect(0, 0, view.width, view.height);
 
   ctx.fillStyle = 'rgba(14, 24, 16, 0.42)';
-  ctx.fillRect(0, 0, game.width, game.height);
+  ctx.fillRect(0, 0, view.width, view.height);
 }
 
 function drawForestProps(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
+  const view = getWorldView(game);
   if (!forestProps.complete || forestProps.naturalWidth <= 0) return;
 
   const columns = 6;
@@ -599,8 +624,8 @@ function drawForestProps(ctx: CanvasRenderingContext2D, game: GameState, camera:
   const propCell = 310;
   const startX = Math.floor(camera.x / propCell) - 1;
   const startY = Math.floor(camera.y / propCell) - 1;
-  const endX = Math.ceil((camera.x + game.width) / propCell) + 1;
-  const endY = Math.ceil((camera.y + game.height) / propCell) + 1;
+  const endX = Math.ceil((camera.x + view.width) / propCell) + 1;
+  const endY = Math.ceil((camera.y + view.height) / propCell) + 1;
 
   for (let gy = startY; gy <= endY; gy += 1) {
     for (let gx = startX; gx <= endX; gx += 1) {
@@ -861,8 +886,21 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   const [saveMessage, setSaveMessage] = useState(saveSession ? 'Cloud save ready' : 'Local test mode');
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterDefinition>(initialCharacter);
   const [selectedWeapon, setSelectedWeapon] = useState<WeaponDefinition>(initialWeapon);
+  const [titleEntered, setTitleEntered] = useState(false);
   const [characterSelected, setCharacterSelected] = useState(false);
   const [weaponSelected, setWeaponSelected] = useState(false);
+  const [characterCarouselIndex, setCharacterCarouselIndex] = useState(2);
+  const [characterDragOffset, setCharacterDragOffset] = useState(0);
+  const characterFrameDragRef = useRef({
+    active: false,
+    startX: 0,
+  });
+  const [weaponCarouselIndex, setWeaponCarouselIndex] = useState(2);
+  const [weaponDragOffset, setWeaponDragOffset] = useState(0);
+  const weaponFrameDragRef = useRef({
+    active: false,
+    startX: 0,
+  });
   const [joystick, setJoystick] = useState<JoystickState>({
     active: false,
     baseX: 0,
@@ -875,6 +913,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
 
   const start = () => {
     unlockAudio();
+    playSound('button');
     requestFullScreen();
     if (gameRef.current.status === 'gameover') {
       gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter, selectedWeapon);
@@ -885,6 +924,8 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   };
 
   const reset = () => {
+    unlockAudio();
+    playSound('button');
     gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter, selectedWeapon);
     savedGameOverRef.current = false;
     syncSnapshot();
@@ -892,6 +933,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
 
   const togglePause = () => {
     unlockAudio();
+    playSound('button');
     const game = gameRef.current;
     if (game.status === 'running') game.status = 'paused';
     else if (game.status === 'paused' || game.status === 'ready') {
@@ -899,6 +941,18 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
       game.status = 'running';
     }
     syncSnapshot();
+  };
+
+  const enterTitle = () => {
+    unlockAudio();
+    startTitleMusic();
+    playSound('button');
+    setTitleEntered(true);
+  };
+
+  const wakeTitleMusic = () => {
+    unlockAudio();
+    startTitleMusic();
   };
 
   useEffect(() => {
@@ -967,6 +1021,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
 
   const chooseUpgrade = (upgrade: Upgrade) => {
     unlockAudio();
+    playSound('select');
     const game = gameRef.current;
     upgrade.apply(game);
     game.upgrades = [];
@@ -999,6 +1054,83 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
     gameRef.current.status = 'ready';
     syncSnapshot();
   };
+
+  const startCharacterFrameDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    unlockAudio();
+    characterFrameDragRef.current = {
+      active: true,
+      startX: event.clientX,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveCharacterFrameDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = characterFrameDragRef.current;
+    if (!drag.active) return;
+    const nextOffset = event.clientX - drag.startX;
+    setCharacterDragOffset(Math.max(-140, Math.min(140, nextOffset)));
+  };
+
+  const endCharacterFrameDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = characterFrameDragRef.current;
+    const delta = event.clientX - drag.startX;
+    characterFrameDragRef.current.active = false;
+    const nextIndex =
+      delta > 70
+        ? Math.max(0, characterCarouselIndex - 1)
+        : delta < -70
+          ? Math.min(4, characterCarouselIndex + 1)
+          : characterCarouselIndex;
+    if (nextIndex !== characterCarouselIndex) {
+      playSound('slide');
+      setCharacterCarouselIndex(nextIndex);
+    }
+    setCharacterDragOffset(0);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const startWeaponFrameDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    unlockAudio();
+    weaponFrameDragRef.current = {
+      active: true,
+      startX: event.clientX,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveWeaponFrameDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = weaponFrameDragRef.current;
+    if (!drag.active) return;
+    const nextOffset = event.clientX - drag.startX;
+    setWeaponDragOffset(Math.max(-140, Math.min(140, nextOffset)));
+  };
+
+  const endWeaponFrameDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = weaponFrameDragRef.current;
+    const delta = event.clientX - drag.startX;
+    weaponFrameDragRef.current.active = false;
+    const nextIndex =
+      delta > 70
+        ? Math.max(0, weaponCarouselIndex - 1)
+        : delta < -70
+          ? Math.min(4, weaponCarouselIndex + 1)
+          : weaponCarouselIndex;
+    if (nextIndex !== weaponCarouselIndex) {
+      playSound('slide');
+      setWeaponCarouselIndex(nextIndex);
+    }
+    setWeaponDragOffset(0);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const characterSlots: Array<CharacterDefinition | null> = [null, null, characters[0], null, null];
+  const centeredCharacter = characterSlots[characterCarouselIndex];
+  const weaponSlots: Array<WeaponDefinition | null> = [null, null, weapons[0], null, null];
+  const centeredWeapon = weaponSlots[weaponCarouselIndex];
 
   const chooseWeapon = (weapon: WeaponDefinition) => {
     unlockAudio();
@@ -1120,14 +1252,28 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
 
         <div className="controls">
           {saveSession && (
-            <button onClick={onSignOut} aria-label="로그아웃">
+            <button
+              onClick={() => {
+                unlockAudio();
+                playSound('button');
+                onSignOut();
+              }}
+              aria-label="로그아웃"
+            >
               <LogOut size={20} />
             </button>
           )}
           <button onClick={snapshot.status === 'running' ? togglePause : start} aria-label={snapshot.status === 'running' ? '일시정지' : '시작'}>
             {snapshot.status === 'running' ? <Pause size={20} /> : <Play size={20} />}
           </button>
-          <button onClick={requestFullScreen} aria-label="전체화면">
+          <button
+            onClick={() => {
+              unlockAudio();
+              playSound('button');
+              requestFullScreen();
+            }}
+            aria-label="전체화면"
+          >
             <Maximize size={20} />
           </button>
           <button onClick={reset} aria-label="다시 시작">
@@ -1151,40 +1297,149 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
           </div>
         )}
 
-        {!characterSelected && (
+        {!titleEntered && (
+          <div className="title-layer" onPointerDown={wakeTitleMusic}>
+            <button className="title-start-button" type="button" onClick={enterTitle}>
+              시작
+            </button>
+            {!isAudioUnlocked() && <span className="title-audio-hint">화면을 터치하면 음악이 시작됩니다</span>}
+          </div>
+        )}
+
+        {titleEntered && !characterSelected && (
           <div className="character-layer">
-            <div className="character-panel">
-              <h2>캐릭터 선택</h2>
-              <div className="character-list">
-                {characters.map((character) => (
-                  <button key={character.id} data-character={character.id} onClick={() => chooseCharacter(character)}>
-                    <span className="character-portrait">
-                      {character.id === 'caiden' ? <img src="assets/images/characters/caiden-portrait.png" alt="" /> : characterName(character).slice(0, 1)}
-                    </span>
-                    <strong>{characterName(character)}</strong>
-                    <span>{characterDescription(character)}</span>
-                  </button>
-                ))}
+            <div className="character-panel character-panel-empty">
+              <div
+                className="character-frame-stage"
+                style={{ '--drag-offset': `${characterDragOffset}px` } as React.CSSProperties}
+                onPointerDown={startCharacterFrameDrag}
+                onPointerMove={moveCharacterFrameDrag}
+                onPointerUp={endCharacterFrameDrag}
+                onPointerCancel={endCharacterFrameDrag}
+                onDragStart={(event) => event.preventDefault()}
+              >
+                {characterSlots.map((character, slotIndex) => {
+                  const relative = slotIndex - characterCarouselIndex;
+                  if (Math.abs(relative) > 2) return null;
+                  const positionClass =
+                    relative === -2
+                      ? 'character-slot-left-far'
+                      : relative === -1
+                        ? 'character-slot-left-near'
+                        : relative === 0
+                          ? 'character-slot-main'
+                          : relative === 1
+                            ? 'character-slot-right-near'
+                            : 'character-slot-right-far';
+                  const isMain = relative === 0;
+                  return (
+                    <div key={slotIndex} className={`character-carousel-card ${positionClass}`}>
+                      {character && (
+                        <span className={isMain ? 'character-preview-art' : 'character-side-art'}>
+                          <img src="assets/images/characters/caiden-portrait.png" alt="" draggable={false} />
+                        </span>
+                      )}
+                      <img
+                        className={isMain ? 'character-preview-frame' : 'character-side-frame'}
+                        src={isMain ? 'assets/images/ui/character-weapon-select/card-frame-main.png' : 'assets/images/ui/character-weapon-select/card-frame-small.png'}
+                        alt=""
+                        draggable={false}
+                      />
+                      {!isMain && character && <span className="character-side-name">{characterName(character)}</span>}
+                      {isMain && character && (
+                        <>
+                          <span className="character-preview-name">{characterName(character)}</span>
+                          <span className="character-preview-description">{characterDescription(character)}</span>
+                        </>
+                      )}
+                      {!character && <span className={isMain ? 'character-main-locked' : 'character-side-locked'}>봉인됨</span>}
+                    </div>
+                  );
+                })}
               </div>
+              <button
+                className="character-select-button"
+                type="button"
+                disabled={!centeredCharacter}
+                onClick={() => centeredCharacter && chooseCharacter(centeredCharacter)}
+              >
+                {centeredCharacter ? '선택' : '봉인됨'}
+              </button>
             </div>
           </div>
         )}
 
         {characterSelected && !weaponSelected && (
           <div className="weapon-layer">
-            <div className="weapon-panel">
-              <h2>무기 선택</h2>
-              <div className="weapon-list">
-                {weapons.map((weapon) => (
-                  <button key={weapon.id} data-weapon={weapon.id} onClick={() => chooseWeapon(weapon)}>
-                    <span className="weapon-portrait">
-                      {weapon.id === 'magic-staff' ? <img src="assets/images/weapons/magic-staff.png" alt="" /> : <span className="weapon-placeholder" />}
-                    </span>
-                    <strong>{weaponName(weapon)}</strong>
-                    <span>{weaponDescription(weapon)}</span>
-                  </button>
-                ))}
+            <div className="selected-character-summary">
+              <span className="selected-character-summary-art">
+                <img src="assets/images/characters/caiden-portrait.png" alt="" draggable={false} />
+              </span>
+              <img
+                className="selected-character-summary-frame"
+                src="assets/images/ui/character-weapon-select/selected-character-panel.png"
+                alt=""
+                draggable={false}
+              />
+              <span className="selected-character-summary-name">{characterName(selectedCharacter)}</span>
+            </div>
+            <div className="character-panel character-panel-empty weapon-select-panel">
+              <div
+                className="character-frame-stage"
+                style={{ '--drag-offset': `${weaponDragOffset}px` } as React.CSSProperties}
+                onPointerDown={startWeaponFrameDrag}
+                onPointerMove={moveWeaponFrameDrag}
+                onPointerUp={endWeaponFrameDrag}
+                onPointerCancel={endWeaponFrameDrag}
+                onDragStart={(event) => event.preventDefault()}
+              >
+                {weaponSlots.map((weapon, slotIndex) => {
+                  const relative = slotIndex - weaponCarouselIndex;
+                  if (Math.abs(relative) > 2) return null;
+                  const positionClass =
+                    relative === -2
+                      ? 'character-slot-left-far'
+                      : relative === -1
+                        ? 'character-slot-left-near'
+                        : relative === 0
+                          ? 'character-slot-main'
+                          : relative === 1
+                            ? 'character-slot-right-near'
+                            : 'character-slot-right-far';
+                  const isMain = relative === 0;
+                  return (
+                    <div key={slotIndex} className={`character-carousel-card weapon-carousel-card ${positionClass}`}>
+                      {weapon && (
+                        <span className={isMain ? 'weapon-preview-art' : 'weapon-side-art'}>
+                          <img src="assets/images/weapons/magic-staff.png" alt="" draggable={false} />
+                        </span>
+                      )}
+                      <img
+                        className={isMain ? 'character-preview-frame' : 'character-side-frame'}
+                        src={isMain ? 'assets/images/ui/character-weapon-select/card-frame-main.png' : 'assets/images/ui/character-weapon-select/card-frame-small.png'}
+                        alt=""
+                        draggable={false}
+                      />
+                      {!isMain && weapon && <span className="character-side-name">{weaponName(weapon)}</span>}
+                      {isMain && weapon && (
+                        <>
+                          <span className="character-preview-name">{weaponName(weapon)}</span>
+                          <span className="character-preview-description">{weaponDescription(weapon)}</span>
+                        </>
+                      )}
+                      {!weapon && <span className={isMain ? 'character-main-locked' : 'character-side-locked'}>봉인됨</span>}
+                    </div>
+                  );
+                })}
               </div>
+              <button
+                className="character-select-button"
+                type="button"
+                disabled={!centeredWeapon}
+                onClick={() => centeredWeapon && chooseWeapon(centeredWeapon)}
+              >
+                {centeredWeapon ? '선택' : '봉인됨'}
+              </button>
             </div>
           </div>
         )}
@@ -1262,7 +1517,7 @@ function AuthGate() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [devBypass, setDevBypass] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [saveSession, setSaveSession] = useState<SaveSession | null>(null);
 
   useEffect(() => {
@@ -1346,6 +1601,71 @@ function AuthGate() {
     setSettingsOpen(true);
   };
 
+  const settingsForm = (submitLabel: string, showLocalEntry = false) => (
+    <form className="auth-panel auth-panel-corner" onSubmit={saveSettings}>
+      <button className="auth-panel-close" type="button" onClick={() => setSettingsOpen(false)} aria-label="보안 설정 닫기">
+        ×
+      </button>
+      <h1>보안 설정</h1>
+      <p>Supabase 저장 정보를 입력하면 진행상황을 클라우드에 저장합니다.</p>
+      <label>
+        <span>Project URL</span>
+        <input
+          value={settings.projectUrl}
+          onChange={(event) => updateSetting('projectUrl', event.target.value)}
+          placeholder="https://your-project-ref.supabase.co"
+          required
+        />
+      </label>
+      <label>
+        <span>Public Key</span>
+        <input
+          value={settings.publicKey}
+          onChange={(event) => updateSetting('publicKey', event.target.value)}
+          placeholder="anon public key"
+          required
+        />
+      </label>
+      <label>
+        <span>Project ID</span>
+        <input
+          value={settings.projectId}
+          onChange={(event) => updateSetting('projectId', event.target.value)}
+          placeholder="auto-filled from URL"
+        />
+      </label>
+      <label>
+        <span>Sync ID</span>
+        <input
+          value={settings.syncId}
+          onChange={(event) => updateSetting('syncId', event.target.value)}
+          placeholder="artera-main"
+          required
+        />
+      </label>
+      <label>
+        <span>PIN Code</span>
+        <input
+          value={settings.pinCode}
+          onChange={(event) => updateSetting('pinCode', event.target.value)}
+          placeholder="4-8 digit code"
+          type="password"
+          required
+        />
+      </label>
+      <button type="submit">{submitLabel}</button>
+      {showLocalEntry && (
+        <button className="secondary-button" type="button" onClick={() => setDevBypass(true)}>
+          Local test entry
+        </button>
+      )}
+      <button className="secondary-button" type="button" onClick={clearSettings}>
+        Clear saved connection
+      </button>
+      {message && <span>{message}</span>}
+    </form>
+  );
+
   if (loading) {
     return (
       <main className="auth-screen">
@@ -1357,104 +1677,23 @@ function AuthGate() {
     );
   }
 
-  if (!client && !devBypass) {
+  if (settingsOpen) {
     return (
-      <main className="auth-screen">
-        <form className="auth-panel" onSubmit={saveSettings}>
-          <h1>Artera Survivor</h1>
-          <p>Enter your Supabase project info to connect this game.</p>
-          <label>
-            <span>Project URL</span>
-            <input
-              value={settings.projectUrl}
-              onChange={(event) => updateSetting('projectUrl', event.target.value)}
-              placeholder="https://your-project-ref.supabase.co"
-              required
-            />
-          </label>
-          <label>
-            <span>Public Key</span>
-            <input
-              value={settings.publicKey}
-              onChange={(event) => updateSetting('publicKey', event.target.value)}
-              placeholder="anon public key"
-              required
-            />
-          </label>
-          <label>
-            <span>Project ID</span>
-            <input
-              value={settings.projectId}
-              onChange={(event) => updateSetting('projectId', event.target.value)}
-              placeholder="auto-filled from URL"
-            />
-          </label>
-          <label>
-            <span>Sync ID</span>
-            <input
-              value={settings.syncId}
-              onChange={(event) => updateSetting('syncId', event.target.value)}
-              placeholder="artera-main"
-              required
-            />
-          </label>
-          <label>
-            <span>PIN Code</span>
-            <input
-              value={settings.pinCode}
-              onChange={(event) => updateSetting('pinCode', event.target.value)}
-              placeholder="4-8 digit code"
-              type="password"
-              required
-            />
-          </label>
-          <button type="submit">Save connection</button>
-          <button className="secondary-button" type="button" onClick={() => setDevBypass(true)}>
-            Local test entry
-          </button>
-          {message && <span>{message}</span>}
-        </form>
-      </main>
+      <>
+        <GameApp saveSession={saveSession} onSignOut={signOut} />
+        <div className="security-drawer">{settingsForm(client ? 'Save and enter' : 'Save connection', !client && !devBypass)}</div>
+      </>
     );
   }
 
-  if (client && settingsOpen) {
-    return (
-      <main className="auth-screen">
-        <form className="auth-panel" onSubmit={saveSettings}>
-          <h1>Artera Survivor</h1>
-          <p>Enter your Supabase project info and shared sync credentials.</p>
-          <label>
-            <span>Project URL</span>
-            <input value={settings.projectUrl} onChange={(event) => updateSetting('projectUrl', event.target.value)} required />
-          </label>
-          <label>
-            <span>Public Key</span>
-            <input value={settings.publicKey} onChange={(event) => updateSetting('publicKey', event.target.value)} required />
-          </label>
-          <label>
-            <span>Project ID</span>
-            <input value={settings.projectId} onChange={(event) => updateSetting('projectId', event.target.value)} />
-          </label>
-          <label>
-            <span>Sync ID</span>
-            <input value={settings.syncId} onChange={(event) => updateSetting('syncId', event.target.value)} required />
-          </label>
-          <label>
-            <span>PIN Code</span>
-            <input value={settings.pinCode} onChange={(event) => updateSetting('pinCode', event.target.value)} type="password" required />
-          </label>
-          <button type="submit">Save and enter</button>
-          <button className="secondary-button" type="button" onClick={clearSettings}>
-            Clear saved connection
-          </button>
-          {message && <span>{message}</span>}
-        </form>
-      </main>
-    );
-  }
-
-  return <GameApp saveSession={saveSession} onSignOut={signOut} />;
+  return (
+    <>
+      <GameApp saveSession={saveSession} onSignOut={signOut} />
+      <button className="security-toggle" type="button" onClick={() => setSettingsOpen(true)}>
+        보안
+      </button>
+    </>
+  );
 }
 
 createRoot(document.getElementById('root')!).render(<AuthGate />);
