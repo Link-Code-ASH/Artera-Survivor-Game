@@ -2021,3 +2021,82 @@ input {
     font-size: 12px;
   }
 }
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .character-layer,
+  .weapon-layer {
+    padding: 6px;
+  }
+
+  .character-panel {
+    min-height: calc(100dvh - 12px);
+    padding: 8px 10px;
+  }
+
+  .character-panel-empty {
+    gap: 6px;
+  }
+
+  .character-frame-stage {
+    width: min(980px, 96vw);
+    min-height: min(330px, calc(100dvh - 64px));
+  }
+
+  .character-slot-main {
+    --slot-y: 4px;
+    width: clamp(220px, 27vw, 310px);
+  }
+
+  .character-slot-left-near {
+    --slot-x: clamp(-255px, -28vw, -190px);
+    --slot-y: -8px;
+    width: clamp(112px, 14vw, 160px);
+  }
+
+  .character-slot-right-near {
+    --slot-x: clamp(190px, 28vw, 255px);
+    --slot-y: -8px;
+    width: clamp(112px, 14vw, 160px);
+  }
+
+  .character-slot-left-far {
+    --slot-x: clamp(-370px, -41vw, -275px);
+    --slot-y: -28px;
+    width: clamp(96px, 12vw, 136px);
+  }
+
+  .character-slot-right-far {
+    --slot-x: clamp(275px, 41vw, 370px);
+    --slot-y: -28px;
+    width: clamp(96px, 12vw, 136px);
+  }
+
+  .character-select-button {
+    width: clamp(160px, 20vw, 230px);
+    font-size: clamp(15px, 1.8vw, 20px);
+  }
+
+  .character-preview-description {
+    font-size: clamp(10px, 1.2vw, 13px);
+    line-height: 1.25;
+  }
+
+  .character-preview-name {
+    font-size: clamp(21px, 2.3vw, 29px);
+  }
+
+  .character-side-name,
+  .character-side-locked {
+    font-size: clamp(10px, 1.3vw, 15px);
+  }
+
+  .selected-character-summary {
+    top: 8px;
+    left: 8px;
+    width: clamp(210px, 27vw, 300px);
+  }
+
+  .selected-character-summary-name {
+    font-size: clamp(14px, 1.6vw, 22px);
+  }
+}

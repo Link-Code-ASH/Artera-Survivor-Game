@@ -18,7 +18,17 @@ import './styles.css';
 type Vec = { x: number; y: number };
 type EnemyKind = 'slime';
 type Enemy = { id: number; x: number; y: number; r: number; hp: number; speed: number; kind: EnemyKind };
-type Bullet = { x: number; y: number; vx: number; vy: number; life: number; damage: number };
+type Bullet = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  damage: number;
+  pierce: number;
+  knockback: number;
+  hitIds: number[];
+};
 type Gem = { x: number; y: number; value: number; r: number };
 type FloatText = { x: number; y: number; text: string; life: number; color: string };
 type Upgrade = {
@@ -75,6 +85,9 @@ type GameState = {
     bulletSpeed: number;
     damage: number;
     projectiles: number;
+    pierce: number;
+    regen: number;
+    knockback: number;
   };
   enemies: Enemy[];
   bullets: Bullet[];
@@ -203,6 +216,56 @@ const upgrades: Upgrade[] = [
       game.player.hp = Math.min(game.player.maxHp, game.player.hp + 36);
     },
   },
+  {
+    id: 'pierce',
+    title: '관통의 룬',
+    body: '마력파가 적을 추가로 관통합니다.',
+    apply: (game) => {
+      game.player.pierce += 1;
+    },
+  },
+  {
+    id: 'velocity',
+    title: '푸른 혜성',
+    body: '마력파가 더 빠르게 날아가고 조금 강해집니다.',
+    apply: (game) => {
+      game.player.bulletSpeed += 95;
+      game.player.damage += 3;
+    },
+  },
+  {
+    id: 'barrier',
+    title: '수호 결계',
+    body: '받는 피해가 감소합니다.',
+    apply: (game) => {
+      game.player.damageTakenMultiplier = Math.max(0.45, game.player.damageTakenMultiplier * 0.86);
+    },
+  },
+  {
+    id: 'regen',
+    title: '생명의 서약',
+    body: '전투 중 체력이 천천히 회복됩니다.',
+    apply: (game) => {
+      game.player.regen += 1.1;
+    },
+  },
+  {
+    id: 'knockback',
+    title: '충격 파동',
+    body: '마력파가 적을 더 강하게 밀쳐냅니다.',
+    apply: (game) => {
+      game.player.knockback += 20;
+    },
+  },
+  {
+    id: 'overload',
+    title: '마력 과부하',
+    body: '피해량과 발사 속도가 함께 증가합니다.',
+    apply: (game) => {
+      game.player.damage += 5;
+      game.player.fireRate = Math.max(0.18, game.player.fireRate * 0.9);
+    },
+  },
 ];
 
 function newGame(width = 960, height = 540, character: CharacterDefinition = characters[0], weapon: WeaponDefinition = weapons[0]): GameState {
@@ -239,6 +302,9 @@ function newGame(width = 960, height = 540, character: CharacterDefinition = cha
       bulletSpeed: weapon.bulletSpeed,
       damage: weapon.damage,
       projectiles: weapon.projectiles,
+      pierce: 0,
+      regen: 0,
+      knockback: 18,
     },
   };
 }
@@ -358,6 +424,9 @@ function shoot(game: GameState) {
       vy: Math.sin(angle) * game.player.bulletSpeed,
       life: 1.15,
       damage: game.player.damage,
+      pierce: game.player.pierce,
+      knockback: game.player.knockback,
+      hitIds: [],
     });
   }
 }
@@ -408,6 +477,9 @@ function updateGame(game: GameState, dt: number) {
   game.player.moving = Math.abs(move.x) > 0.04 || Math.abs(move.y) > 0.04;
   game.player.facing = lastMoveDirection;
   game.player.attackTimer = Math.max(0, game.player.attackTimer - dt);
+  if (game.player.regen > 0) {
+    game.player.hp = Math.min(game.player.maxHp, game.player.hp + game.player.regen * dt);
+  }
   game.player.x += move.x * game.player.speed * dt;
   game.player.y += move.y * game.player.speed * dt;
 
@@ -445,9 +517,16 @@ function updateGame(game: GameState, dt: number) {
     if (bullet.life <= 0) continue;
     for (const enemy of game.enemies) {
       if (enemy.hp <= 0) continue;
+      if (bullet.hitIds.includes(enemy.id)) continue;
       if (Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y) < enemy.r + 5) {
         enemy.hp -= bullet.damage;
-        bullet.life = 0;
+        bullet.hitIds.push(enemy.id);
+        const push = norm({ x: bullet.vx, y: bullet.vy });
+        enemy.x += push.x * bullet.knockback;
+        enemy.y += push.y * bullet.knockback;
+        if (bullet.hitIds.length > bullet.pierce) {
+          bullet.life = 0;
+        }
         playSound('hit');
         if (enemy.hp <= 0) {
           game.gems.push({ x: enemy.x, y: enemy.y, value: 4, r: 5 });
@@ -529,19 +608,8 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
 }
 
 function drawMap(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
-  const view = getWorldView(game);
   drawForestGround(ctx, game, camera);
   drawForestProps(ctx, game, camera);
-
-  ctx.strokeStyle = 'rgba(255, 246, 223, 0.08)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 3; i += 1) {
-    const y = ((camera.y * -0.04 + i * 170) % (view.height + 180)) - 90;
-    ctx.beginPath();
-    ctx.moveTo(-40, y);
-    ctx.bezierCurveTo(view.width * 0.24, y - 30, view.width * 0.52, y + 24, view.width + 40, y - 12);
-    ctx.stroke();
-  }
 }
 
 function drawForestGround(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
