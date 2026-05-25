@@ -3,11 +3,6 @@ type SoundName = 'shoot' | 'hit' | 'pickup' | 'levelup' | 'gameover' | 'select';
 let audioContext: AudioContext | null = null;
 let enabled = false;
 
-const soundFiles: Partial<Record<SoundName, { src: string; volume: number }>> = {
-  shoot: { src: 'assets/sounds/magic-wave-cast.wav', volume: 0.55 },
-  hit: { src: 'assets/sounds/monster-hit.wav', volume: 0.62 },
-};
-
 function getAudioContext() {
   if (!audioContext) {
     const AudioContextClass =
@@ -23,16 +18,6 @@ export function unlockAudio() {
   if (context.state === 'suspended') {
     context.resume().catch(() => undefined);
   }
-}
-
-function playAudioFile(name: SoundName) {
-  const file = soundFiles[name];
-  if (!file || !enabled) return false;
-
-  const audio = new Audio(file.src);
-  audio.volume = file.volume;
-  audio.play().catch(() => undefined);
-  return true;
 }
 
 function tone(
@@ -98,8 +83,6 @@ function noise(duration: number, gain = 0.03, delay = 0, filterFrequency = 1200)
 
 export function playSound(name: SoundName) {
   if (!enabled) return;
-
-  if (playAudioFile(name)) return;
 
   if (name === 'shoot') {
     tone(260, 0.1, 'sine', 0.03, 0, 560, -0.08);

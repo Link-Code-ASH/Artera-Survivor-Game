@@ -281,12 +281,23 @@ function pickUpgrades(game: GameState) {
 }
 
 function spawnEnemy(game: GameState) {
-  const angle = Math.random() * Math.PI * 2;
-  const distance = Math.max(game.width, game.height) * 0.62 + 80;
-  const pos = {
-    x: game.player.x + Math.cos(angle) * distance,
-    y: game.player.y + Math.sin(angle) * distance,
-  };
+  const camera = getCamera(game);
+  const margin = 90;
+  const side = Math.floor(Math.random() * 4);
+  const pos = { x: game.player.x, y: game.player.y };
+  if (side === 0) {
+    pos.x = camera.x - margin;
+    pos.y = camera.y + Math.random() * game.height;
+  } else if (side === 1) {
+    pos.x = camera.x + game.width + margin;
+    pos.y = camera.y + Math.random() * game.height;
+  } else if (side === 2) {
+    pos.x = camera.x + Math.random() * game.width;
+    pos.y = camera.y - margin;
+  } else {
+    pos.x = camera.x + Math.random() * game.width;
+    pos.y = camera.y + game.height + margin;
+  }
   const minutes = game.time / 60;
   game.enemies.push({
     id: game.nextId++,
