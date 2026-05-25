@@ -1954,6 +1954,126 @@ input {
   line-height: 1.45;
 }
 
+.upgrade-layer {
+  z-index: 13;
+  padding: clamp(14px, 3vw, 32px);
+  background: rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(3px);
+}
+
+.upgrade-panel {
+  width: min(1080px, 94vw);
+  aspect-ratio: 1672 / 941;
+  display: grid;
+  align-content: center;
+  padding: clamp(76px, 9vh, 118px) clamp(68px, 7vw, 118px) clamp(54px, 7vh, 86px);
+  border: 0;
+  border-radius: 0;
+  background: url("../assets/images/ui/ability-select/bg-ability-select-base.png") center / contain no-repeat;
+  box-shadow: none;
+  overflow: visible;
+  animation: abilityPopupIn 180ms ease-out both;
+}
+
+.upgrade-panel::before,
+.upgrade-panel::after {
+  display: none;
+}
+
+.upgrade-panel h2 {
+  display: none;
+}
+
+.upgrade-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(14px, 2.4vw, 34px);
+  align-items: center;
+  justify-items: center;
+}
+
+.upgrade-list button {
+  position: relative;
+  display: block;
+  width: clamp(150px, 17vw, 232px);
+  aspect-ratio: 780 / 1399;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: url("../assets/images/ui/ability-select/ability-frame.png") center / contain no-repeat;
+  box-shadow: none;
+  color: #fff6df;
+  cursor: pointer;
+  text-align: center;
+  filter: drop-shadow(0 24px 38px rgba(0, 0, 0, 0.5));
+  transition:
+    filter 160ms ease,
+    transform 160ms ease;
+}
+
+@keyframes abilityPopupIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.upgrade-list button::before,
+.upgrade-list button::after {
+  display: none;
+}
+
+.upgrade-list button:hover,
+.upgrade-list button:focus-visible {
+  outline: 0;
+  background: url("../assets/images/ui/ability-select/ability-frame.png") center / contain no-repeat;
+  filter:
+    drop-shadow(0 0 22px rgba(116, 202, 255, 0.5))
+    drop-shadow(0 28px 42px rgba(0, 0, 0, 0.56))
+    brightness(1.06);
+  transform: translateY(-6px) scale(1.02);
+}
+
+.upgrade-list button:active {
+  transform: translateY(-2px) scale(1.01);
+}
+
+.upgrade-list strong {
+  position: absolute;
+  top: 60%;
+  left: 15%;
+  right: 15%;
+  display: block;
+  margin: 0;
+  color: #ffe8ad;
+  font-size: clamp(18px, 2vw, 28px);
+  line-height: 1.12;
+  text-align: center;
+  text-shadow:
+    0 3px 4px rgba(0, 0, 0, 0.92),
+    0 0 12px rgba(49, 150, 255, 0.26);
+}
+
+.upgrade-list span {
+  position: absolute;
+  top: 73%;
+  left: 15%;
+  right: 15%;
+  display: block;
+  color: rgba(238, 244, 255, 0.78);
+  font-size: clamp(12px, 1.15vw, 16px);
+  line-height: 1.35;
+  text-align: center;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.9);
+}
+
 @media (max-width: 720px) {
   .shell {
     padding: 0;

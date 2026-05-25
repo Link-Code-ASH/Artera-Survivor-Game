@@ -1352,7 +1352,6 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
         {snapshot.status === 'levelup' && (
           <div className="upgrade-layer">
             <div className="upgrade-panel">
-              <h2>강화 선택</h2>
               <div className="upgrade-list">
                 {snapshot.upgrades.map((upgrade) => (
                   <button key={upgrade.id} data-upgrade={upgrade.id} onClick={() => chooseUpgrade(upgrade)}>
