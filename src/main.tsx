@@ -16,7 +16,7 @@ import { createSupabaseClient, hasSupabaseConfig, supabase } from './supabaseCli
 import './styles.css';
 
 type Vec = { x: number; y: number };
-type EnemyKind = 'slime' | 'skeleton';
+type EnemyKind = 'slime';
 type Enemy = { id: number; x: number; y: number; r: number; hp: number; speed: number; kind: EnemyKind };
 type Bullet = { x: number; y: number; vx: number; vy: number; life: number; damage: number };
 type Gem = { x: number; y: number; value: number; r: number };
@@ -33,6 +33,17 @@ type CharacterDefinition = {
   name: string;
   description: string;
   damageTakenMultiplier: number;
+};
+
+type WeaponDefinition = {
+  id: string;
+  name: string;
+  description: string;
+  projectileName: string;
+  fireRate: number;
+  bulletSpeed: number;
+  damage: number;
+  projectiles: number;
 };
 
 type Direction = 'down' | 'left' | 'right' | 'up';
@@ -94,14 +105,33 @@ const characters: CharacterDefinition[] = [
   },
 ];
 
+const weapons: WeaponDefinition[] = [
+  {
+    id: 'magic-staff',
+    name: '마법 지팡이',
+    description: '응축한 마력을 파동으로 날립니다.',
+    projectileName: '마력파',
+    fireRate: 0.62,
+    bulletSpeed: 530,
+    damage: 18,
+    projectiles: 1,
+  },
+];
+
 const caidenAtlas = new Image();
 caidenAtlas.src = 'assets/images/characters/caiden-4dir.png';
 const caidenPortrait = new Image();
 caidenPortrait.src = 'assets/images/characters/caiden-portrait.png';
+const magicStaffIcon = new Image();
+magicStaffIcon.src = 'assets/images/weapons/magic-staff.png';
+const magicWaveAtlas = new Image();
+magicWaveAtlas.src = 'assets/images/projectiles/magic-wave.png';
 const forestGroundTiles = new Image();
 forestGroundTiles.src = 'assets/images/maps/forest/tiles/grass-tiles.png';
 const forestProps = new Image();
 forestProps.src = 'assets/images/maps/forest/props/forest-props.png';
+const forestSlimeAtlas = new Image();
+forestSlimeAtlas.src = 'assets/images/enemies/forest-slime-2dir.png';
 
 function characterName(character: CharacterDefinition) {
   if (character.id === 'caiden') return '케이든';
@@ -113,11 +143,21 @@ function characterDescription(character: CharacterDefinition) {
   return character.description;
 }
 
+function weaponName(weapon: WeaponDefinition) {
+  if (weapon.id === 'magic-staff') return '마법 지팡이';
+  return weapon.name;
+}
+
+function weaponDescription(weapon: WeaponDefinition) {
+  if (weapon.id === 'magic-staff') return '응축한 마력을 파동으로 날립니다.';
+  return weapon.description;
+}
+
 const upgrades: Upgrade[] = [
   {
     id: 'rapid',
     title: '비전 서책',
-    body: '마력 화살을 더 자주 발사합니다.',
+    body: '마력파를 더 자주 발사합니다.',
     apply: (game) => {
       game.player.fireRate = Math.max(0.18, game.player.fireRate * 0.84);
     },
@@ -125,7 +165,7 @@ const upgrades: Upgrade[] = [
   {
     id: 'damage',
     title: '룬 각인',
-    body: '마력 화살의 피해량이 증가합니다.',
+    body: '마력파의 피해량이 증가합니다.',
     apply: (game) => {
       game.player.damage += 7;
     },
@@ -133,7 +173,7 @@ const upgrades: Upgrade[] = [
   {
     id: 'projectile',
     title: '쌍월 주문',
-    body: '한 번에 발사하는 화살이 늘어납니다.',
+    body: '한 번에 발사하는 마력파가 늘어납니다.',
     apply: (game) => {
       game.player.projectiles += 1;
     },
@@ -165,7 +205,7 @@ const upgrades: Upgrade[] = [
   },
 ];
 
-function newGame(width = 960, height = 540, character: CharacterDefinition = characters[0]): GameState {
+function newGame(width = 960, height = 540, character: CharacterDefinition = characters[0], weapon: WeaponDefinition = weapons[0]): GameState {
   const baseSpeed = 190;
   return {
     status: 'ready',
@@ -195,10 +235,10 @@ function newGame(width = 960, height = 540, character: CharacterDefinition = cha
       nextXp: 18,
       level: 1,
       magnet: 82,
-      fireRate: 0.62,
-      bulletSpeed: 530,
-      damage: 18,
-      projectiles: 1,
+      fireRate: weapon.fireRate,
+      bulletSpeed: weapon.bulletSpeed,
+      damage: weapon.damage,
+      projectiles: weapon.projectiles,
     },
   };
 }
@@ -248,15 +288,14 @@ function spawnEnemy(game: GameState) {
     y: game.player.y + Math.sin(angle) * distance,
   };
   const minutes = game.time / 60;
-  const skeleton = Math.random() < Math.min(0.32, minutes * 0.07);
   game.enemies.push({
     id: game.nextId++,
     x: pos.x,
     y: pos.y,
-    r: skeleton ? 18 : 13,
-    hp: skeleton ? 58 + minutes * 12 : 28 + minutes * 8,
-    speed: skeleton ? 68 + minutes * 5 : 88 + minutes * 7,
-    kind: skeleton ? 'skeleton' : 'slime',
+    r: 13,
+    hp: 28 + minutes * 8,
+    speed: 88 + minutes * 7,
+    kind: 'slime',
   });
 }
 
@@ -380,9 +419,10 @@ function updateGame(game: GameState, dt: number) {
       if (Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y) < enemy.r + 5) {
         enemy.hp -= bullet.damage;
         bullet.life = 0;
+        playSound('hit');
         if (enemy.hp <= 0) {
-          game.gems.push({ x: enemy.x, y: enemy.y, value: enemy.kind === 'skeleton' ? 7 : 4, r: enemy.kind === 'skeleton' ? 7 : 5 });
-          game.texts.push({ x: enemy.x, y: enemy.y, text: `+${enemy.kind === 'skeleton' ? 7 : 4}`, life: 0.7, color: '#9ee8ff' });
+          game.gems.push({ x: enemy.x, y: enemy.y, value: 4, r: 5 });
+          game.texts.push({ x: enemy.x, y: enemy.y, text: '+4', life: 0.7, color: '#9ee8ff' });
         }
         break;
       }
@@ -431,7 +471,7 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
   ctx.translate(-camera.x, -camera.y);
   for (const gem of game.gems) drawCrystal(ctx, gem);
   for (const bullet of game.bullets) drawMagicBolt(ctx, bullet);
-  for (const enemy of game.enemies) drawEnemy(ctx, enemy);
+  for (const enemy of game.enemies) drawEnemy(ctx, enemy, game);
   drawHero(ctx, game);
 
   for (const text of game.texts) {
@@ -530,11 +570,11 @@ function drawForestGround(ctx: CanvasRenderingContext2D, game: GameState, camera
     Math.max(game.width, game.height) * 0.72,
   );
   shade.addColorStop(0, 'rgba(255, 255, 255, 0)');
-  shade.addColorStop(1, 'rgba(9, 18, 12, 0.2)');
+  shade.addColorStop(1, 'rgba(9, 18, 12, 0.26)');
   ctx.fillStyle = shade;
   ctx.fillRect(0, 0, game.width, game.height);
 
-  ctx.fillStyle = 'rgba(18, 30, 18, 0.3)';
+  ctx.fillStyle = 'rgba(14, 24, 16, 0.42)';
   ctx.fillRect(0, 0, game.width, game.height);
 }
 
@@ -598,7 +638,9 @@ function drawForestProps(ctx: CanvasRenderingContext2D, game: GameState, camera:
               ];
       const pick = variants[Math.floor(seededNoise(gx - 5, gy + 23) * variants.length) % variants.length];
       const scale = 0.72 + seededNoise(gx + 101, gy - 47) * 0.28;
-      const drawSize = 118 * scale;
+      const drawSize = Math.round(118 * scale);
+      const drawX = Math.round(px - camera.x - drawSize / 2);
+      const drawY = Math.round(py - camera.y - drawSize * 0.78);
 
       ctx.drawImage(
         forestProps,
@@ -606,8 +648,8 @@ function drawForestProps(ctx: CanvasRenderingContext2D, game: GameState, camera:
         Math.floor(pick[1] * sourceCellHeight),
         Math.ceil(sourceCellWidth),
         Math.ceil(sourceCellHeight),
-        Math.floor(px - camera.x - drawSize / 2),
-        Math.floor(py - camera.y - drawSize * 0.78),
+        drawX,
+        drawY,
         drawSize,
         drawSize,
       );
@@ -630,38 +672,71 @@ function drawCrystal(ctx: CanvasRenderingContext2D, gem: Gem) {
 }
 
 function drawMagicBolt(ctx: CanvasRenderingContext2D, bullet: Bullet) {
-  ctx.fillStyle = '#f8dc86';
-  ctx.shadowColor = '#f8dc86';
-  ctx.shadowBlur = 10;
-  ctx.beginPath();
-  ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-}
-
-function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy) {
-  if (enemy.kind === 'slime') {
-    ctx.fillStyle = '#66b970';
-    ctx.beginPath();
-    ctx.ellipse(enemy.x, enemy.y + 2, enemy.r * 1.08, enemy.r * 0.82, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#1b4525';
-    ctx.beginPath();
-    ctx.arc(enemy.x - 4, enemy.y - 2, 2, 0, Math.PI * 2);
-    ctx.arc(enemy.x + 5, enemy.y - 2, 2, 0, Math.PI * 2);
-    ctx.fill();
+  const angle = Math.atan2(bullet.vy, bullet.vx);
+  if (magicWaveAtlas.complete && magicWaveAtlas.naturalWidth > 0) {
+    ctx.save();
+    ctx.translate(bullet.x, bullet.y);
+    ctx.rotate(angle);
+    ctx.drawImage(magicWaveAtlas, -18, -13, 38, 26);
+    ctx.restore();
     return;
   }
 
-  ctx.strokeStyle = '#ded7c4';
-  ctx.lineWidth = 4;
+  ctx.save();
+  ctx.translate(bullet.x, bullet.y);
+  ctx.rotate(angle);
+  ctx.shadowColor = '#8ee8ff';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = 'rgba(125, 224, 255, 0.85)';
   ctx.beginPath();
-  ctx.arc(enemy.x, enemy.y - 6, enemy.r * 0.52, 0, Math.PI * 2);
-  ctx.moveTo(enemy.x, enemy.y + 1);
-  ctx.lineTo(enemy.x, enemy.y + enemy.r);
-  ctx.moveTo(enemy.x - 10, enemy.y + 7);
-  ctx.lineTo(enemy.x + 10, enemy.y + 7);
-  ctx.stroke();
+  ctx.ellipse(0, 0, 15, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#fff1a8';
+  ctx.beginPath();
+  ctx.arc(9, 0, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy, game: GameState) {
+  if (forestSlimeAtlas.complete && forestSlimeAtlas.naturalWidth > 0) {
+    const columns = 4;
+    const rows = 2;
+    const sourceWidth = forestSlimeAtlas.naturalWidth / columns;
+    const sourceHeight = forestSlimeAtlas.naturalHeight / rows;
+    const frame = Math.floor(game.time * 7 + enemy.id * 0.37) % columns;
+    const row = enemy.x > game.player.x ? 0 : 1;
+    const drawWidth = 76;
+    const drawHeight = 55 + Math.sin(game.time * 12 + enemy.id) * 2.5;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.beginPath();
+    ctx.ellipse(enemy.x, enemy.y + 14, 28, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.drawImage(
+      forestSlimeAtlas,
+      Math.floor(frame * sourceWidth),
+      Math.floor(row * sourceHeight),
+      Math.ceil(sourceWidth),
+      Math.ceil(sourceHeight),
+      enemy.x - drawWidth / 2,
+      enemy.y - drawHeight * 0.7,
+      drawWidth,
+      drawHeight,
+    );
+    return;
+  }
+
+  ctx.fillStyle = '#66b970';
+  ctx.beginPath();
+  ctx.ellipse(enemy.x, enemy.y + 2, enemy.r * 1.08, enemy.r * 0.82, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1b4525';
+  ctx.beginPath();
+  ctx.arc(enemy.x - 4, enemy.y - 2, 2, 0, Math.PI * 2);
+  ctx.arc(enemy.x + 5, enemy.y - 2, 2, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
@@ -681,7 +756,7 @@ function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
     const sourceY = Math.max(0, Math.floor(row * frameSize) - upExtra);
     const sourceWidth = Math.ceil(frameSize);
     const sourceHeight = Math.ceil(frameSize) + upExtra;
-    const heroScale = 1.3;
+    const heroScale = 1.56;
     const drawWidth = 74 * heroScale;
     const drawHeight = (p.facing === 'up' ? 86 : 74) * heroScale;
     const drawY = p.y - drawHeight * (p.facing === 'up' ? 0.48 : 0.68);
@@ -764,7 +839,9 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const selectedCharacterId = saveSession?.initialSaveData.profile.selectedCharacter || characters[0].id;
   const initialCharacter = characters.find((character) => character.id === selectedCharacterId) || characters[0];
-  const gameRef = useRef<GameState>(newGame(960, 540, initialCharacter));
+  const selectedWeaponId = saveSession?.initialSaveData.profile.selectedWeapon || weapons[0].id;
+  const initialWeapon = weapons.find((weapon) => weapon.id === selectedWeaponId) || weapons[0];
+  const gameRef = useRef<GameState>(newGame(960, 540, initialCharacter, initialWeapon));
   const frameRef = useRef(0);
   const lastRef = useRef(0);
   const savedGameOverRef = useRef(false);
@@ -772,7 +849,9 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   const [saveData, setSaveData] = useState<GameSaveData>(saveSession?.initialSaveData || createDefaultSaveData());
   const [saveMessage, setSaveMessage] = useState(saveSession ? 'Cloud save ready' : 'Local test mode');
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterDefinition>(initialCharacter);
+  const [selectedWeapon, setSelectedWeapon] = useState<WeaponDefinition>(initialWeapon);
   const [characterSelected, setCharacterSelected] = useState(false);
+  const [weaponSelected, setWeaponSelected] = useState(false);
   const [joystick, setJoystick] = useState<JoystickState>({
     active: false,
     baseX: 0,
@@ -787,7 +866,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
     unlockAudio();
     requestFullScreen();
     if (gameRef.current.status === 'gameover') {
-      gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter);
+      gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter, selectedWeapon);
       savedGameOverRef.current = false;
     }
     gameRef.current.status = 'running';
@@ -795,7 +874,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   };
 
   const reset = () => {
-    gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter);
+    gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter, selectedWeapon);
     savedGameOverRef.current = false;
     syncSnapshot();
   };
@@ -902,9 +981,35 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
         .then(() => setSaveMessage('Character saved'))
         .catch(() => setSaveMessage('Character save failed'));
     }
-    gameRef.current = newGame(gameRef.current.width, gameRef.current.height, character);
+    gameRef.current = newGame(gameRef.current.width, gameRef.current.height, character, selectedWeapon);
     savedGameOverRef.current = false;
     setCharacterSelected(true);
+    setWeaponSelected(false);
+    gameRef.current.status = 'ready';
+    syncSnapshot();
+  };
+
+  const chooseWeapon = (weapon: WeaponDefinition) => {
+    unlockAudio();
+    playSound('select');
+    setSelectedWeapon(weapon);
+    const nextSaveData = {
+      ...saveData,
+      profile: {
+        ...saveData.profile,
+        selectedWeapon: weapon.id,
+      },
+    };
+    setSaveData(nextSaveData);
+    if (saveSession) {
+      setSaveMessage('Saving weapon...');
+      saveGameSave(saveSession.client, saveSession.credentials, nextSaveData)
+        .then(() => setSaveMessage('Weapon saved'))
+        .catch(() => setSaveMessage('Weapon save failed'));
+    }
+    gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter, weapon);
+    savedGameOverRef.current = false;
+    setWeaponSelected(true);
     gameRef.current.status = 'running';
     syncSnapshot();
   };
@@ -1025,7 +1130,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
               <h2>강화 선택</h2>
               <div className="upgrade-list">
                 {snapshot.upgrades.map((upgrade) => (
-                  <button key={upgrade.id} onClick={() => chooseUpgrade(upgrade)}>
+                  <button key={upgrade.id} data-upgrade={upgrade.id} onClick={() => chooseUpgrade(upgrade)}>
                     <strong>{upgrade.title}</strong>
                     <span>{upgrade.body}</span>
                   </button>
@@ -1041,12 +1146,31 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
               <h2>캐릭터 선택</h2>
               <div className="character-list">
                 {characters.map((character) => (
-                  <button key={character.id} onClick={() => chooseCharacter(character)}>
+                  <button key={character.id} data-character={character.id} onClick={() => chooseCharacter(character)}>
                     <span className="character-portrait">
                       {character.id === 'caiden' ? <img src="assets/images/characters/caiden-portrait.png" alt="" /> : characterName(character).slice(0, 1)}
                     </span>
                     <strong>{characterName(character)}</strong>
                     <span>{characterDescription(character)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {characterSelected && !weaponSelected && (
+          <div className="weapon-layer">
+            <div className="weapon-panel">
+              <h2>무기 선택</h2>
+              <div className="weapon-list">
+                {weapons.map((weapon) => (
+                  <button key={weapon.id} data-weapon={weapon.id} onClick={() => chooseWeapon(weapon)}>
+                    <span className="weapon-portrait">
+                      {weapon.id === 'magic-staff' ? <img src="assets/images/weapons/magic-staff.png" alt="" /> : <span className="weapon-placeholder" />}
+                    </span>
+                    <strong>{weaponName(weapon)}</strong>
+                    <span>{weaponDescription(weapon)}</span>
                   </button>
                 ))}
               </div>
