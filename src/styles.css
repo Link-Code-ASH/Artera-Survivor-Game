@@ -251,6 +251,33 @@ input {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.save-status {
+  position: absolute;
+  z-index: 3;
+  right: 12px;
+  bottom: 34px;
+  display: grid;
+  gap: 3px;
+  max-width: min(360px, calc(100% - 24px));
+  padding: 8px 10px;
+  border: 1px solid rgba(248, 220, 134, 0.18);
+  border-radius: 8px;
+  background: rgba(31, 33, 22, 0.68);
+  color: rgba(255, 246, 223, 0.84);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  text-align: right;
+}
+
+.save-status strong {
+  color: #fff6df;
+  font-size: 13px;
+}
+
+.save-status span {
+  font-size: 12px;
+}
+
 .upgrade-layer {
   position: absolute;
   inset: 0;

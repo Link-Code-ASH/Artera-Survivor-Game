@@ -2,6 +2,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { LogOut, Maximize, Pause, Play, RotateCcw } from 'lucide-react';
+import {
+  createDefaultSaveData,
+  loadGameSave,
+  recordRun,
+  saveGameSave,
+  type GameSaveData,
+  type SyncCredentials,
+  verifyGameSync,
+} from './saveSystem';
 import { createSupabaseClient, hasSupabaseConfig, supabase } from './supabaseClient';
 import './styles.css';
 
@@ -516,12 +525,21 @@ function formatTime(seconds: number) {
   return `${m}:${s}`;
 }
 
-function GameApp({ connected, onSignOut }: { connected: boolean; onSignOut: () => void }) {
+type SaveSession = {
+  client: SupabaseClient;
+  credentials: SyncCredentials;
+  initialSaveData: GameSaveData;
+};
+
+function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; onSignOut: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gameRef = useRef<GameState>(newGame());
   const frameRef = useRef(0);
   const lastRef = useRef(0);
+  const savedGameOverRef = useRef(false);
   const [snapshot, setSnapshot] = useState(gameRef.current);
+  const [saveData, setSaveData] = useState<GameSaveData>(saveSession?.initialSaveData || createDefaultSaveData());
+  const [saveMessage, setSaveMessage] = useState(saveSession ? 'Cloud save ready' : 'Local test mode');
 
   const syncSnapshot = () => setSnapshot({ ...gameRef.current, player: { ...gameRef.current.player } });
 
@@ -529,6 +547,7 @@ function GameApp({ connected, onSignOut }: { connected: boolean; onSignOut: () =
     requestFullScreen();
     if (gameRef.current.status === 'gameover') {
       gameRef.current = newGame(gameRef.current.width, gameRef.current.height);
+      savedGameOverRef.current = false;
     }
     gameRef.current.status = 'running';
     syncSnapshot();
@@ -536,6 +555,7 @@ function GameApp({ connected, onSignOut }: { connected: boolean; onSignOut: () =
 
   const reset = () => {
     gameRef.current = newGame(gameRef.current.width, gameRef.current.height);
+    savedGameOverRef.current = false;
     syncSnapshot();
   };
 
@@ -578,6 +598,20 @@ function GameApp({ connected, onSignOut }: { connected: boolean; onSignOut: () =
       const dt = Math.min(0.033, (now - last) / 1000);
       lastRef.current = now;
       updateGame(gameRef.current, dt);
+      if (gameRef.current.status === 'gameover' && !savedGameOverRef.current) {
+        savedGameOverRef.current = true;
+        const nextSaveData = recordRun(saveData, {
+          time: gameRef.current.time,
+          level: gameRef.current.player.level,
+        });
+        setSaveData(nextSaveData);
+        if (saveSession) {
+          setSaveMessage('Saving progress...');
+          saveGameSave(saveSession.client, saveSession.credentials, nextSaveData)
+            .then(() => setSaveMessage('Progress saved'))
+            .catch(() => setSaveMessage('Save failed'));
+        }
+      }
       drawGame(ctx, gameRef.current);
       syncSnapshot();
       frameRef.current = requestAnimationFrame(tick);
@@ -601,7 +635,7 @@ function GameApp({ connected, onSignOut }: { connected: boolean; onSignOut: () =
       window.removeEventListener('keyup', up);
       cancelAnimationFrame(frameRef.current);
     };
-  }, []);
+  }, [saveData, saveSession]);
 
   const chooseUpgrade = (upgrade: Upgrade) => {
     const game = gameRef.current;
@@ -656,6 +690,11 @@ function GameApp({ connected, onSignOut }: { connected: boolean; onSignOut: () =
           </div>
         </div>
 
+        <div className="save-status">
+          <strong>{saveMessage}</strong>
+          <span>Runs {saveData.stats.totalRuns} · Best {formatTime(saveData.stats.bestTime)} · Best Lv {saveData.stats.bestLevel}</span>
+        </div>
+
         <div className="bars">
           <div className="bar hp">
             <span style={{ width: `${(snapshot.player.hp / snapshot.player.maxHp) * 100}%` }} />
@@ -666,7 +705,7 @@ function GameApp({ connected, onSignOut }: { connected: boolean; onSignOut: () =
         </div>
 
         <div className="controls">
-          {connected && (
+          {saveSession && (
             <button onClick={onSignOut} aria-label="로그아웃">
               <LogOut size={20} />
             </button>
@@ -763,12 +802,12 @@ function AuthGate() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [devBypass, setDevBypass] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(!client);
+  const [settingsOpen, setSettingsOpen] = useState(true);
+  const [saveSession, setSaveSession] = useState<SaveSession | null>(null);
 
   useEffect(() => {
-    if (client && isReadyForConnection(settings)) {
-      setSettingsOpen(false);
-    }
+    if (!client || !isReadyForConnection(settings)) return;
+    setMessage('Saved connection is ready. Press Save and enter to verify PIN.');
   }, [client, settings]);
 
   const updateSetting = (key: keyof SupabaseSettings, value: string) => {
@@ -781,7 +820,7 @@ function AuthGate() {
     });
   };
 
-  const saveSettings = (event: React.FormEvent) => {
+  const saveSettings = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!settings.projectUrl.trim() || !settings.publicKey.trim()) {
       setMessage('Project URL and Public Key are required.');
@@ -797,23 +836,53 @@ function AuthGate() {
       pinCode: settings.pinCode.trim(),
     };
 
-    localStorage.setItem(settingsKey, JSON.stringify(normalized));
-    setSettings(normalized);
-    setClient(createSupabaseClient(normalized.projectUrl, normalized.publicKey));
-    setSettingsOpen(false);
-    setLoading(false);
-    setMessage('Supabase connection saved.');
+    if (!isReadyForConnection(normalized)) {
+      setMessage('Project URL, Public Key, Sync ID, and PIN Code are required.');
+      return;
+    }
+
+    const nextClient = createSupabaseClient(normalized.projectUrl, normalized.publicKey);
+    setLoading(true);
+    setMessage('Checking Sync ID and PIN...');
+
+    try {
+      const credentials = {
+        projectId: normalized.projectId,
+        syncId: normalized.syncId,
+        pinCode: normalized.pinCode,
+      };
+      const verified = await verifyGameSync(nextClient, credentials);
+      if (!verified) {
+        setMessage('Sync ID or PIN Code is not correct.');
+        setLoading(false);
+        return;
+      }
+
+      const initialSaveData = await loadGameSave(nextClient, credentials);
+      localStorage.setItem(settingsKey, JSON.stringify(normalized));
+      setSettings(normalized);
+      setClient(nextClient);
+      setSaveSession({ client: nextClient, credentials, initialSaveData });
+      setSettingsOpen(false);
+      setMessage('Cloud save connected.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not connect cloud save.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const clearSettings = () => {
     localStorage.removeItem(settingsKey);
     setSettings(blankSettings());
     setClient(hasSupabaseConfig ? supabase : null);
+    setSaveSession(null);
     setSettingsOpen(true);
     setMessage('Saved connection was cleared.');
   };
 
   const signOut = () => {
+    setSaveSession(null);
     setSettingsOpen(true);
   };
 
@@ -925,7 +994,7 @@ function AuthGate() {
     );
   }
 
-  return <GameApp connected={Boolean(client && isReadyForConnection(settings))} onSignOut={signOut} />;
+  return <GameApp saveSession={saveSession} onSignOut={signOut} />;
 }
 
 createRoot(document.getElementById('root')!).render(<AuthGate />);
