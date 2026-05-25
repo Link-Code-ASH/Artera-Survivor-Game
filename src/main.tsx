@@ -129,8 +129,8 @@ function newGame(width = 960, height = 540): GameState {
     texts: [],
     upgrades: [],
     player: {
-      x: width / 2,
-      y: height / 2,
+      x: 0,
+      y: 0,
       r: 16,
       hp: 100,
       maxHp: 100,
@@ -160,6 +160,18 @@ function norm(v: Vec): Vec {
   return { x: v.x / l, y: v.y / l };
 }
 
+function getCamera(game: GameState): Vec {
+  return {
+    x: game.player.x - game.width / 2,
+    y: game.player.y - game.height / 2,
+  };
+}
+
+function seededNoise(x: number, y: number) {
+  const value = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  return value - Math.floor(value);
+}
+
 function requestFullScreen() {
   const root = document.documentElement;
   if (!document.fullscreenElement && root.requestFullscreen) {
@@ -173,14 +185,12 @@ function pickUpgrades(game: GameState) {
 }
 
 function spawnEnemy(game: GameState) {
-  const side = Math.floor(Math.random() * 4);
-  const margin = 42;
-  const pos = [
-    { x: -margin, y: Math.random() * game.height },
-    { x: game.width + margin, y: Math.random() * game.height },
-    { x: Math.random() * game.width, y: -margin },
-    { x: Math.random() * game.width, y: game.height + margin },
-  ][side];
+  const angle = Math.random() * Math.PI * 2;
+  const distance = Math.max(game.width, game.height) * 0.62 + 80;
+  const pos = {
+    x: game.player.x + Math.cos(angle) * distance,
+    y: game.player.y + Math.sin(angle) * distance,
+  };
   const minutes = game.time / 60;
   const skeleton = Math.random() < Math.min(0.32, minutes * 0.07);
   game.enemies.push({
@@ -256,8 +266,8 @@ function updateGame(game: GameState, dt: number) {
   game.time += dt;
 
   const move = inputVector();
-  game.player.x = clamp(game.player.x + move.x * game.player.speed * dt, game.player.r, game.width - game.player.r);
-  game.player.y = clamp(game.player.y + move.y * game.player.speed * dt, game.player.r, game.height - game.player.r);
+  game.player.x += move.x * game.player.speed * dt;
+  game.player.y += move.y * game.player.speed * dt;
 
   game.spawnClock -= dt;
   const spawnDelay = Math.max(0.16, 0.76 - game.time * 0.006);
@@ -324,7 +334,8 @@ function updateGame(game: GameState, dt: number) {
     text.life -= dt;
   }
 
-  game.bullets = game.bullets.filter((b) => b.life > 0 && b.x > -80 && b.y > -80 && b.x < game.width + 80 && b.y < game.height + 80);
+  game.bullets = game.bullets.filter((b) => b.life > 0 && Math.hypot(b.x - game.player.x, b.y - game.player.y) < 1300);
+  game.enemies = game.enemies.filter((e) => Math.hypot(e.x - game.player.x, e.y - game.player.y) < 1800);
   game.enemies = game.enemies.filter((e) => e.hp > 0);
   game.gems = game.gems.filter((g) => g.value > 0);
   game.texts = game.texts.filter((t) => t.life > 0);
@@ -337,8 +348,11 @@ function updateGame(game: GameState, dt: number) {
 
 function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
   ctx.clearRect(0, 0, game.width, game.height);
-  drawMap(ctx, game);
+  const camera = getCamera(game);
+  drawMap(ctx, game, camera);
 
+  ctx.save();
+  ctx.translate(-camera.x, -camera.y);
   for (const gem of game.gems) drawCrystal(ctx, gem);
   for (const bullet of game.bullets) drawMagicBolt(ctx, bullet);
   for (const enemy of game.enemies) drawEnemy(ctx, enemy);
@@ -352,6 +366,7 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
     ctx.fillText(text.text, text.x, text.y);
     ctx.globalAlpha = 1;
   }
+  ctx.restore();
 
   if (game.status === 'ready') {
     drawCenterMessage(ctx, game, 'ARTERA SURVIVOR', '시작하면 숲 외곽의 침입자들이 몰려옵니다');
@@ -364,7 +379,7 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
   }
 }
 
-function drawMap(ctx: CanvasRenderingContext2D, game: GameState) {
+function drawMap(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
   const bg = ctx.createLinearGradient(0, 0, game.width, game.height);
   bg.addColorStop(0, '#21371f');
   bg.addColorStop(0.5, '#334727');
@@ -375,16 +390,19 @@ function drawMap(ctx: CanvasRenderingContext2D, game: GameState) {
   ctx.strokeStyle = 'rgba(222, 196, 128, 0.13)';
   ctx.lineWidth = 34;
   ctx.beginPath();
-  ctx.moveTo(-60, game.height * 0.68);
-  ctx.quadraticCurveTo(game.width * 0.3, game.height * 0.52, game.width * 0.58, game.height * 0.63);
-  ctx.quadraticCurveTo(game.width * 0.78, game.height * 0.72, game.width + 80, game.height * 0.48);
+  for (let sx = -80; sx <= game.width + 80; sx += 80) {
+    const wx = camera.x + sx;
+    const wy = Math.sin(wx * 0.003) * 120 - camera.y;
+    if (sx === -80) ctx.moveTo(sx, wy);
+    else ctx.lineTo(sx, wy);
+  }
   ctx.stroke();
 
   ctx.strokeStyle = 'rgba(16, 24, 18, 0.18)';
   ctx.lineWidth = 1;
   const tile = 56;
-  const ox = (game.player.x * -0.16) % tile;
-  const oy = (game.player.y * -0.16) % tile;
+  const ox = -((camera.x % tile) + tile) % tile;
+  const oy = -((camera.y % tile) + tile) % tile;
   for (let x = ox; x < game.width; x += tile) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
@@ -398,11 +416,21 @@ function drawMap(ctx: CanvasRenderingContext2D, game: GameState) {
     ctx.stroke();
   }
 
-  drawTree(ctx, 92 + ox * 0.4, 92 + oy * 0.3, 1);
-  drawTree(ctx, game.width - 110 + ox * 0.3, 124 + oy * 0.2, 0.9);
-  drawTree(ctx, 128 + ox * 0.2, game.height - 120 + oy * 0.3, 0.8);
-  drawRuin(ctx, game.width * 0.72 + ox * 0.2, game.height * 0.76 + oy * 0.2);
-  drawRuin(ctx, game.width * 0.2 + ox * 0.16, game.height * 0.38 + oy * 0.12);
+  const propCell = 260;
+  const startX = Math.floor(camera.x / propCell) * propCell - propCell;
+  const startY = Math.floor(camera.y / propCell) * propCell - propCell;
+  for (let wx = startX; wx < camera.x + game.width + propCell; wx += propCell) {
+    for (let wy = startY; wy < camera.y + game.height + propCell; wy += propCell) {
+      const seed = seededNoise(wx, wy);
+      const px = wx + 36 + seededNoise(wx + 11, wy) * (propCell - 72) - camera.x;
+      const py = wy + 36 + seededNoise(wx, wy + 17) * (propCell - 72) - camera.y;
+      if (seed < 0.48) {
+        drawTree(ctx, px, py, 0.72 + seededNoise(wx + 5, wy + 9) * 0.42);
+      } else if (seed > 0.86) {
+        drawRuin(ctx, px, py);
+      }
+    }
+  }
 }
 
 function drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
@@ -580,12 +608,8 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
       const width = Math.max(320, Math.floor(rect?.width || window.innerWidth));
       const height = Math.max(420, Math.floor(rect?.height || window.innerHeight));
       const game = gameRef.current;
-      const xRatio = game.player.x / game.width;
-      const yRatio = game.player.y / game.height;
       game.width = width;
       game.height = height;
-      game.player.x = clamp(xRatio * width, game.player.r, width - game.player.r);
-      game.player.y = clamp(yRatio * height, game.player.r, height - game.player.r);
       canvas.width = width * window.devicePixelRatio;
       canvas.height = height * window.devicePixelRatio;
       canvas.style.width = `${width}px`;
