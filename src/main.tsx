@@ -77,6 +77,14 @@ const pointerMove: Vec = { x: 0, y: 0 };
 let pointerActive = false;
 let lastMoveDirection: Direction = 'down';
 
+type JoystickState = {
+  active: boolean;
+  baseX: number;
+  baseY: number;
+  knobX: number;
+  knobY: number;
+};
+
 const characters: CharacterDefinition[] = [
   {
     id: 'caiden',
@@ -90,6 +98,10 @@ const caidenAtlas = new Image();
 caidenAtlas.src = 'assets/images/characters/caiden-4dir.png';
 const caidenPortrait = new Image();
 caidenPortrait.src = 'assets/images/characters/caiden-portrait.png';
+const forestGroundTiles = new Image();
+forestGroundTiles.src = 'assets/images/maps/forest/tiles/grass-tiles.png';
+const forestProps = new Image();
+forestProps.src = 'assets/images/maps/forest/props/forest-props.png';
 
 function characterName(character: CharacterDefinition) {
   if (character.id === 'caiden') return '케이든';
@@ -444,88 +456,8 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
 }
 
 function drawMap(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
-  const bg = ctx.createLinearGradient(0, 0, game.width, game.height);
-  bg.addColorStop(0, '#21371f');
-  bg.addColorStop(0.5, '#334727');
-  bg.addColorStop(1, '#1f3022');
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, game.width, game.height);
-
-  const patchCell = 180;
-  const patchStartX = Math.floor(camera.x / patchCell) * patchCell - patchCell;
-  const patchStartY = Math.floor(camera.y / patchCell) * patchCell - patchCell;
-  for (let wx = patchStartX; wx < camera.x + game.width + patchCell; wx += patchCell) {
-    for (let wy = patchStartY; wy < camera.y + game.height + patchCell; wy += patchCell) {
-      const seed = seededNoise(wx + 41, wy + 73);
-      const px = wx + seededNoise(wx + 7, wy) * patchCell - camera.x;
-      const py = wy + seededNoise(wx, wy + 13) * patchCell - camera.y;
-      if (seed < 0.34) {
-        ctx.fillStyle = 'rgba(58, 91, 42, 0.26)';
-        ctx.beginPath();
-        ctx.ellipse(px, py, 58 + seed * 44, 24 + seed * 26, seed * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (seed > 0.88) {
-        ctx.fillStyle = 'rgba(166, 153, 112, 0.22)';
-        ctx.beginPath();
-        ctx.arc(px, py, 6 + seed * 7, 0, Math.PI * 2);
-        ctx.arc(px + 18, py - 4, 4 + seed * 5, 0, Math.PI * 2);
-        ctx.arc(px - 14, py + 7, 3 + seed * 4, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (seed > 0.78) {
-        ctx.fillStyle = 'rgba(137, 194, 133, 0.26)';
-        for (let i = 0; i < 5; i += 1) {
-          ctx.beginPath();
-          ctx.arc(px + i * 9 - 18, py + Math.sin(i) * 7, 2.2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-    }
-  }
-
-  ctx.strokeStyle = 'rgba(222, 196, 128, 0.13)';
-  ctx.lineWidth = 34;
-  ctx.beginPath();
-  for (let sx = -80; sx <= game.width + 80; sx += 80) {
-    const wx = camera.x + sx;
-    const wy = Math.sin(wx * 0.003) * 120 - camera.y;
-    if (sx === -80) ctx.moveTo(sx, wy);
-    else ctx.lineTo(sx, wy);
-  }
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(16, 24, 18, 0.18)';
-  ctx.lineWidth = 1;
-  const tile = 56;
-  const ox = -((camera.x % tile) + tile) % tile;
-  const oy = -((camera.y % tile) + tile) % tile;
-  for (let x = ox; x < game.width; x += tile) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, game.height);
-    ctx.stroke();
-  }
-  for (let y = oy; y < game.height; y += tile) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(game.width, y);
-    ctx.stroke();
-  }
-
-  const propCell = 260;
-  const startX = Math.floor(camera.x / propCell) * propCell - propCell;
-  const startY = Math.floor(camera.y / propCell) * propCell - propCell;
-  for (let wx = startX; wx < camera.x + game.width + propCell; wx += propCell) {
-    for (let wy = startY; wy < camera.y + game.height + propCell; wy += propCell) {
-      const seed = seededNoise(wx, wy);
-      const px = wx + 36 + seededNoise(wx + 11, wy) * (propCell - 72) - camera.x;
-      const py = wy + 36 + seededNoise(wx, wy + 17) * (propCell - 72) - camera.y;
-      if (seed < 0.48) {
-        drawTree(ctx, px, py, 0.72 + seededNoise(wx + 5, wy + 9) * 0.42);
-      } else if (seed > 0.86) {
-        drawRuin(ctx, px, py);
-      }
-    }
-  }
+  drawForestGround(ctx, game, camera);
+  drawForestProps(ctx, game, camera);
 
   ctx.strokeStyle = 'rgba(255, 246, 223, 0.08)';
   ctx.lineWidth = 1;
@@ -538,25 +470,149 @@ function drawMap(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
   }
 }
 
-function drawTree(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number) {
-  ctx.fillStyle = '#5a3f24';
-  ctx.fillRect(x - 5 * scale, y + 8 * scale, 10 * scale, 18 * scale);
-  ctx.fillStyle = '#16351e';
-  ctx.beginPath();
-  ctx.arc(x, y, 24 * scale, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#28542a';
-  ctx.beginPath();
-  ctx.arc(x - 10 * scale, y - 7 * scale, 15 * scale, 0, Math.PI * 2);
-  ctx.arc(x + 12 * scale, y - 4 * scale, 17 * scale, 0, Math.PI * 2);
-  ctx.fill();
+function drawForestGround(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
+  ctx.fillStyle = '#24381f';
+  ctx.fillRect(0, 0, game.width, game.height);
+
+  if (!forestGroundTiles.complete || forestGroundTiles.naturalWidth <= 0) {
+    const bg = ctx.createLinearGradient(0, 0, game.width, game.height);
+    bg.addColorStop(0, '#21371f');
+    bg.addColorStop(0.5, '#334727');
+    bg.addColorStop(1, '#1f3022');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, game.width, game.height);
+    return;
+  }
+
+  const columns = 8;
+  const rows = 4;
+  const sourceTileWidth = forestGroundTiles.naturalWidth / columns;
+  const sourceTileHeight = forestGroundTiles.naturalHeight / rows;
+  const tileSize = 122;
+  const sourceInset = 5;
+  const startTileX = Math.floor(camera.x / tileSize) - 1;
+  const startTileY = Math.floor(camera.y / tileSize) - 1;
+  const endTileX = Math.ceil((camera.x + game.width) / tileSize) + 1;
+  const endTileY = Math.ceil((camera.y + game.height) / tileSize) + 1;
+
+  for (let ty = startTileY; ty <= endTileY; ty += 1) {
+    for (let tx = startTileX; tx <= endTileX; tx += 1) {
+      const worldX = tx * tileSize + tileSize / 2;
+      const worldY = ty * tileSize + tileSize / 2;
+      const pathY = Math.sin(worldX * 0.0026) * 210 + Math.sin(worldX * 0.0061) * 58;
+      const pathDistance = Math.abs(worldY - pathY);
+      const seed = seededNoise(tx, ty);
+      const column = Math.floor(seed * columns) % columns;
+      let row = seed > 0.64 ? 1 : 0;
+      if (pathDistance < 58) row = 2;
+      else if (pathDistance < 92) row = 3;
+
+      ctx.drawImage(
+        forestGroundTiles,
+        Math.floor(column * sourceTileWidth + sourceInset),
+        Math.floor(row * sourceTileHeight + sourceInset),
+        Math.ceil(sourceTileWidth - sourceInset * 2),
+        Math.ceil(sourceTileHeight - sourceInset * 2),
+        Math.floor(tx * tileSize - camera.x) - 1,
+        Math.floor(ty * tileSize - camera.y) - 1,
+        tileSize + 3,
+        tileSize + 3,
+      );
+    }
+  }
+
+  const shade = ctx.createRadialGradient(
+    game.width / 2,
+    game.height / 2,
+    Math.min(game.width, game.height) * 0.25,
+    game.width / 2,
+    game.height / 2,
+    Math.max(game.width, game.height) * 0.72,
+  );
+  shade.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  shade.addColorStop(1, 'rgba(9, 18, 12, 0.2)');
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, 0, game.width, game.height);
+
+  ctx.fillStyle = 'rgba(18, 30, 18, 0.3)';
+  ctx.fillRect(0, 0, game.width, game.height);
 }
 
-function drawRuin(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  ctx.fillStyle = 'rgba(142, 136, 115, 0.45)';
-  ctx.fillRect(x - 20, y - 8, 40, 16);
-  ctx.fillRect(x - 14, y - 27, 10, 20);
-  ctx.fillRect(x + 8, y - 24, 10, 18);
+function drawForestProps(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
+  if (!forestProps.complete || forestProps.naturalWidth <= 0) return;
+
+  const columns = 6;
+  const rows = 4;
+  const sourceCellWidth = forestProps.naturalWidth / columns;
+  const sourceCellHeight = forestProps.naturalHeight / rows;
+  const propCell = 310;
+  const startX = Math.floor(camera.x / propCell) - 1;
+  const startY = Math.floor(camera.y / propCell) - 1;
+  const endX = Math.ceil((camera.x + game.width) / propCell) + 1;
+  const endY = Math.ceil((camera.y + game.height) / propCell) + 1;
+
+  for (let gy = startY; gy <= endY; gy += 1) {
+    for (let gx = startX; gx <= endX; gx += 1) {
+      const seed = seededNoise(gx + 19, gy - 31);
+      if (seed < 0.34) continue;
+
+      const worldBaseX = gx * propCell;
+      const worldBaseY = gy * propCell;
+      const px = worldBaseX + 70 + seededNoise(gx + 7, gy) * (propCell - 140);
+      const py = worldBaseY + 72 + seededNoise(gx, gy + 11) * (propCell - 144);
+      const pathY = Math.sin(px * 0.0026) * 210 + Math.sin(px * 0.0061) * 58;
+      if (Math.abs(py - pathY) < 118 && seed < 0.76) continue;
+
+      const variants =
+        seed > 0.9
+          ? [
+              [0, 3],
+              [1, 3],
+              [2, 3],
+              [3, 3],
+              [4, 3],
+              [5, 3],
+            ]
+          : seed > 0.68
+            ? [
+                [0, 1],
+                [1, 1],
+                [2, 1],
+                [3, 1],
+                [4, 1],
+                [5, 1],
+              ]
+            : [
+                [0, 0],
+                [1, 0],
+                [2, 0],
+                [3, 0],
+                [4, 0],
+                [5, 0],
+                [0, 2],
+                [1, 2],
+                [2, 2],
+                [3, 2],
+                [4, 2],
+                [5, 2],
+              ];
+      const pick = variants[Math.floor(seededNoise(gx - 5, gy + 23) * variants.length) % variants.length];
+      const scale = 0.72 + seededNoise(gx + 101, gy - 47) * 0.28;
+      const drawSize = 118 * scale;
+
+      ctx.drawImage(
+        forestProps,
+        Math.floor(pick[0] * sourceCellWidth),
+        Math.floor(pick[1] * sourceCellHeight),
+        Math.ceil(sourceCellWidth),
+        Math.ceil(sourceCellHeight),
+        Math.floor(px - camera.x - drawSize / 2),
+        Math.floor(py - camera.y - drawSize * 0.78),
+        drawSize,
+        drawSize,
+      );
+    }
+  }
 }
 
 function drawCrystal(ctx: CanvasRenderingContext2D, gem: Gem) {
@@ -625,8 +681,9 @@ function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
     const sourceY = Math.max(0, Math.floor(row * frameSize) - upExtra);
     const sourceWidth = Math.ceil(frameSize);
     const sourceHeight = Math.ceil(frameSize) + upExtra;
-    const drawWidth = 74;
-    const drawHeight = p.facing === 'up' ? 86 : 74;
+    const heroScale = 1.3;
+    const drawWidth = 74 * heroScale;
+    const drawHeight = (p.facing === 'up' ? 86 : 74) * heroScale;
     const drawY = p.y - drawHeight * (p.facing === 'up' ? 0.48 : 0.68);
 
     ctx.save();
@@ -716,6 +773,13 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   const [saveMessage, setSaveMessage] = useState(saveSession ? 'Cloud save ready' : 'Local test mode');
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterDefinition>(initialCharacter);
   const [characterSelected, setCharacterSelected] = useState(false);
+  const [joystick, setJoystick] = useState<JoystickState>({
+    active: false,
+    baseX: 0,
+    baseY: 0,
+    knobX: 0,
+    knobY: 0,
+  });
 
   const syncSnapshot = () => setSnapshot({ ...gameRef.current, player: { ...gameRef.current.player } });
 
@@ -845,6 +909,23 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
     syncSnapshot();
   };
 
+  const moveJoystick = (clientX: number, clientY: number, baseX: number, baseY: number) => {
+    const maxDistance = 58;
+    const dx = clientX - baseX;
+    const dy = clientY - baseY;
+    const distance = Math.hypot(dx, dy);
+    const scale = distance > maxDistance ? maxDistance / distance : 1;
+    const knobX = baseX + dx * scale;
+    const knobY = baseY + dy * scale;
+    pointerMove.x = clamp(dx / maxDistance, -1, 1);
+    pointerMove.y = clamp(dy / maxDistance, -1, 1);
+    setJoystick((current) => ({
+      ...current,
+      knobX,
+      knobY,
+    }));
+  };
+
   return (
     <main className="shell">
       <section className="game-wrap">
@@ -853,27 +934,44 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
           className="game-canvas"
           onPointerDown={(event) => {
             pointerActive = true;
+            pointerMove.x = 0;
+            pointerMove.y = 0;
+            setJoystick({
+              active: true,
+              baseX: event.clientX,
+              baseY: event.clientY,
+              knobX: event.clientX,
+              knobY: event.clientY,
+            });
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={(event) => {
             if (!pointerActive) return;
-            const rect = event.currentTarget.getBoundingClientRect();
-            const cx = rect.left + rect.width / 2;
-            const cy = rect.top + rect.height / 2;
-            pointerMove.x = clamp((event.clientX - cx) / 80, -1, 1);
-            pointerMove.y = clamp((event.clientY - cy) / 80, -1, 1);
+            moveJoystick(event.clientX, event.clientY, joystick.baseX, joystick.baseY);
           }}
           onPointerUp={() => {
             pointerActive = false;
             pointerMove.x = 0;
             pointerMove.y = 0;
+            setJoystick((current) => ({ ...current, active: false }));
           }}
           onPointerCancel={() => {
             pointerActive = false;
             pointerMove.x = 0;
             pointerMove.y = 0;
+            setJoystick((current) => ({ ...current, active: false }));
           }}
         />
+
+        {joystick.active && (
+          <div className="virtual-joystick" style={{ left: joystick.baseX, top: joystick.baseY }}>
+            <span
+              style={{
+                transform: `translate(${joystick.knobX - joystick.baseX}px, ${joystick.knobY - joystick.baseY}px)`,
+              }}
+            />
+          </div>
+        )}
 
         <div className="hud top">
           <div>
@@ -1118,7 +1216,7 @@ function AuthGate() {
       <main className="auth-screen">
         <div className="auth-panel">
           <h1>Artera Survivor</h1>
-          <p>?깆냼??臾몄쓣 ?щ뒗 以묒엯?덈떎.</p>
+          <p>성소의 문을 여는 중입니다.</p>
         </div>
       </main>
     );

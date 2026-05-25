@@ -251,6 +251,35 @@ input {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.virtual-joystick {
+  position: fixed;
+  z-index: 7;
+  width: 116px;
+  height: 116px;
+  margin: -58px 0 0 -58px;
+  border: 2px solid rgba(255, 246, 223, 0.34);
+  border-radius: 50%;
+  background: rgba(14, 18, 13, 0.28);
+  box-shadow:
+    inset 0 0 24px rgba(248, 220, 134, 0.08),
+    0 10px 30px rgba(0, 0, 0, 0.24);
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+.virtual-joystick span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border: 1px solid rgba(255, 246, 223, 0.48);
+  border-radius: 50%;
+  background: rgba(248, 220, 134, 0.34);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.32);
+}
+
 .save-status {
   position: absolute;
   z-index: 3;
