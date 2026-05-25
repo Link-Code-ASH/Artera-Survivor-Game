@@ -46,7 +46,7 @@ create or replace function public.verify_game_sync(
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   matched_count integer;
@@ -56,7 +56,7 @@ begin
   from public.game_syncs
   where project_id = input_project_id
     and sync_id = input_sync_id
-    and pin_hash = crypt(input_pin_code, pin_hash);
+    and pin_hash = extensions.crypt(input_pin_code, pin_hash);
 
   return matched_count > 0;
 end;
@@ -70,7 +70,7 @@ create or replace function public.get_game_save(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   current_save jsonb;
@@ -102,7 +102,7 @@ create or replace function public.upsert_game_save(
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   if not public.verify_game_sync(input_project_id, input_sync_id, input_pin_code) then
@@ -133,7 +133,7 @@ insert into public.game_syncs (project_id, sync_id, pin_hash)
 values (
   'YOUR_PROJECT_ID',
   'artera-main',
-  crypt('YOUR_PIN_CODE', gen_salt('bf'))
+  extensions.crypt('YOUR_PIN_CODE', extensions.gen_salt('bf'))
 )
 on conflict (project_id, sync_id)
 do update set pin_hash = excluded.pin_hash;

@@ -11,6 +11,7 @@ import {
   type SyncCredentials,
   verifyGameSync,
 } from './saveSystem';
+import { playSound, unlockAudio } from './soundSystem';
 import { createSupabaseClient, hasSupabaseConfig, supabase } from './supabaseClient';
 import './styles.css';
 
@@ -239,6 +240,7 @@ function nearestEnemy(game: GameState) {
 function shoot(game: GameState) {
   const target = nearestEnemy(game);
   if (!target) return;
+  playSound('shoot');
   const base = Math.atan2(target.y - game.player.y, target.x - game.player.x);
   const count = game.player.projectiles;
   const spread = count === 1 ? 0 : 0.22;
@@ -262,6 +264,7 @@ function gainXp(game: GameState, amount: number) {
     game.player.level += 1;
     game.player.nextXp = Math.floor(game.player.nextXp * 1.28 + 7);
     game.texts.push({ x: game.player.x, y: game.player.y - 30, text: 'LEVEL UP', life: 1, color: '#f8dc86' });
+    playSound('levelup');
     pickUpgrades(game);
     break;
   }
@@ -344,6 +347,7 @@ function updateGame(game: GameState, dt: number) {
     }
     if (d < game.player.r + gem.r) {
       gem.value = -gem.value;
+      playSound('pickup');
       gainXp(game, Math.abs(gem.value));
     }
   }
@@ -359,9 +363,10 @@ function updateGame(game: GameState, dt: number) {
   game.gems = game.gems.filter((g) => g.value > 0);
   game.texts = game.texts.filter((t) => t.life > 0);
 
-  if (game.player.hp <= 0) {
+  if (game.player.hp <= 0 && game.status !== 'gameover') {
     game.player.hp = 0;
     game.status = 'gameover';
+    playSound('gameover');
   }
 }
 
@@ -595,6 +600,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   const syncSnapshot = () => setSnapshot({ ...gameRef.current, player: { ...gameRef.current.player } });
 
   const start = () => {
+    unlockAudio();
     requestFullScreen();
     if (gameRef.current.status === 'gameover') {
       gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter);
@@ -611,6 +617,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   };
 
   const togglePause = () => {
+    unlockAudio();
     const game = gameRef.current;
     if (game.status === 'running') game.status = 'paused';
     else if (game.status === 'paused' || game.status === 'ready') {
@@ -685,6 +692,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   }, [saveData, saveSession]);
 
   const chooseUpgrade = (upgrade: Upgrade) => {
+    unlockAudio();
     const game = gameRef.current;
     upgrade.apply(game);
     game.upgrades = [];
@@ -693,6 +701,8 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   };
 
   const chooseCharacter = (character: CharacterDefinition) => {
+    unlockAudio();
+    playSound('select');
     setSelectedCharacter(character);
     const nextSaveData = {
       ...saveData,
@@ -870,6 +880,14 @@ function isReadyForConnection(settings: SupabaseSettings) {
   return Boolean(settings.projectUrl.trim() && settings.publicKey.trim() && settings.syncId.trim() && settings.pinCode.trim());
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+  return 'Could not connect cloud save.';
+}
+
 function AuthGate() {
   const [settings, setSettings] = useState<SupabaseSettings>(() => {
     const stored = readStoredSettings();
@@ -952,7 +970,7 @@ function AuthGate() {
       setSettingsOpen(false);
       setMessage('Cloud save connected.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not connect cloud save.');
+      setMessage(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
