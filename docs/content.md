@@ -3,7 +3,7 @@
 ## Current Content
 - Character: `caiden`
 - Weapon: `magic-staff`
-- Enemy kind: `slime`
+- Enemy kinds: `slime`, `goblin`
 - Map theme: forest
 - Item: `xp-gem-small`
 - Save mode: local test by default, optional Supabase cloud save through security settings.
@@ -35,8 +35,19 @@ When adding a weapon, update:
 ## Enemies
 Current enemy type:
 - `slime`: Basic chasing enemy.
+- `goblin`: Slower but tougher forest enemy. Appears from stage 2 onward.
 
-Current slime drop:
+Current enemy drops:
+- `slime`: Drops 1 `xp-gem-small`.
+- `goblin`: Drops 2 `xp-gem-small`.
+
+Current enemy spawn rules:
+- Stage 1 only spawns slimes.
+- From stage 2 onward, goblins appear at about a 1 goblin per 3 slimes ratio.
+
+Current enemy assets:
+- `slime`: `public/assets/images/enemies/forest-slime-2dir.png`
+- `goblin`: `public/assets/images/enemies/forest-goblin-2dir.png`
 - `xp-gem-small`: XP and upgrade-currency gem rendered from `public/assets/images/items/gems/xp-gem-small.png`.
 
 When adding enemies, update:

@@ -37,3 +37,4 @@ The user may later refine:
 - Code structure has started moving away from one large `src/main.tsx`: content now lives in `src/content/`, shared types and gameplay systems live in `src/game/`.
 - Waiting-room upgrade choices now need a reroll flow: spend gems to redraw choices, with the cost increasing by 1 per reroll during the same visit.
 - Stage maps are now bounded rather than infinite. Starting a new stage restores HP to full, and waiting-room upgrades can be purchased multiple times before manually continuing.
+- Stage spawn pacing is now explicit: the current stage 1 monster count is the baseline, then each stage increases monster count by 5% over the previous stage.

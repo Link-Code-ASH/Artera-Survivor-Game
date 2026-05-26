@@ -47,6 +47,8 @@ const forestProps = new Image();
 forestProps.src = 'assets/images/maps/forest/props/forest-props.png';
 const forestSlimeAtlas = new Image();
 forestSlimeAtlas.src = 'assets/images/enemies/forest-slime-2dir.png';
+const forestGoblinAtlas = new Image();
+forestGoblinAtlas.src = 'assets/images/enemies/forest-goblin-2dir.png';
 const xpGemImage = new Image();
 xpGemImage.src = 'assets/images/items/gems/xp-gem-small.png';
 
@@ -335,6 +337,34 @@ function drawMagicBolt(ctx: CanvasRenderingContext2D, bullet: Bullet) {
 }
 
 function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy, game: GameState) {
+  if (enemy.kind === 'goblin' && forestGoblinAtlas.complete && forestGoblinAtlas.naturalWidth > 0) {
+    const columns = 4;
+    const rows = 2;
+    const sourceWidth = forestGoblinAtlas.naturalWidth / columns;
+    const sourceHeight = forestGoblinAtlas.naturalHeight / rows;
+    const frame = Math.floor(game.time * 6 + enemy.id * 0.31) % columns;
+    const row = enemy.x > game.player.x ? 1 : 0;
+    const drawWidth = 72;
+    const drawHeight = 72 + Math.sin(game.time * 10 + enemy.id) * 1.5;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(enemy.x, enemy.y + 15, 24, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.drawImage(
+      forestGoblinAtlas,
+      Math.floor(frame * sourceWidth),
+      Math.floor(row * sourceHeight),
+      Math.ceil(sourceWidth),
+      Math.ceil(sourceHeight),
+      enemy.x - drawWidth / 2,
+      enemy.y - drawHeight * 0.78,
+      drawWidth,
+      drawHeight,
+    );
+    return;
+  }
+
   if (forestSlimeAtlas.complete && forestSlimeAtlas.naturalWidth > 0) {
     const columns = 4;
     const rows = 2;

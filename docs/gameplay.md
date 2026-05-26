@@ -20,6 +20,8 @@ The main loop is:
 - The game should use fixed stages instead of one endless timer.
 - The current first-pass stage duration is 30 seconds.
 - Stage maps should have a limited size instead of behaving like an infinite world.
+- Stage 1 is the baseline monster-count reference.
+- Each new stage should spawn about 5% more monsters than the previous stage.
 - When a stage ends, combat pauses and the player enters a waiting-room ability selection.
 - The waiting room should use a temporary custom layout instead of the existing ability-select asset screen.
 - When the next stage starts, player HP is fully restored.

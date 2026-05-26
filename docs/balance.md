@@ -125,6 +125,19 @@ Use this section as the baseline when the user asks to raise, lower, speed up, s
 | Contact pushback | `18 * dt` | `src/game/systems.ts` | Small separation push while touching player. |
 | Defense | None | Current design | Enemies currently do not have armor or damage reduction. |
 
+### Enemy: Goblin
+
+| Value | Current Value | Code Location | Notes |
+| --- | ---: | --- | --- |
+| Enemy ID | `goblin` | `src/game/types.ts`, `src/game/systems.ts` | Appears from stage 2 onward. |
+| Spawn ratio | `1 goblin : 3 slimes` | `src/game/systems.ts` | Implemented as a 25% goblin chance from stage 2 onward. |
+| Collision radius | `15` | `src/game/systems.ts` | Slightly larger than slime. |
+| HP | `slime HP * 2` | `src/game/systems.ts` | Uses the current scaled slime HP. |
+| Movement speed | `slime speed * 0.8` | `src/game/systems.ts` | Slower than slime. |
+| Contact damage | `slime damage * 1.5` | `src/game/systems.ts` | Higher than slime. |
+| Gem drop count | `2` | `src/game/systems.ts` | Drops two XP/currency gems when defeated. |
+| Defense | None | Current design | Enemies currently do not have armor or damage reduction. |
+
 ### Spawning And Stage Pressure
 
 | Value | Current Value | Code Location | Notes |
@@ -134,7 +147,9 @@ Use this section as the baseline when the user asks to raise, lower, speed up, s
 | Map height | `1600` | `src/game/state.ts` | Bounded arena height. |
 | Spawn margin | `90` | `src/game/systems.ts` | Spawn attempt is just outside the camera view. |
 | Minimum spawn delay | `0.16` seconds | `src/game/systems.ts` | Spawn delay cannot go below this. |
-| Spawn delay formula | `0.76 - (stage - 1) * 0.06 - stageTime * 0.002` | `src/game/systems.ts` | Higher stages and later stage time spawn faster. |
+| Stage 1 spawn amount | `100%` current baseline | `src/game/systems.ts` | This is the baseline for future spawn-count requests. |
+| Per-stage spawn growth | `+5%` per stage | `src/game/systems.ts` | Each stage uses `1.05 ^ (stage - 1)`. |
+| Spawn delay formula | `(1.0857 - stageTime * 0.002) / (1.05 ^ (stage - 1))` | `src/game/systems.ts` | Current stage 1 pacing is now treated as the baseline. Higher spawn multiplier means shorter delay and more monsters. |
 | Enemy cleanup range | `1800` | `src/game/systems.ts` | Enemies farther than this from player are removed. |
 | Projectile cleanup range | `1300` | `src/game/systems.ts` | Projectiles farther than this from player are removed. |
 
@@ -143,6 +158,7 @@ Use this section as the baseline when the user asks to raise, lower, speed up, s
 | Value | Current Value | Code Location | Notes |
 | --- | ---: | --- | --- |
 | Gem drop count per slime | `1` | `src/game/systems.ts` | One gem object is created when a slime dies. |
+| Gem drop count per goblin | `2` | `src/game/systems.ts` | Two gem objects are created when a goblin dies. |
 | Gem XP value | `4` | `src/game/systems.ts` | Stored as gem `value`. |
 | Gem currency value | `1` | `src/game/systems.ts` | Each collected gem adds 1 upgrade currency. |
 | Gem collision radius | `5` | `src/game/systems.ts` | Gem pickup radius before adding player radius. |

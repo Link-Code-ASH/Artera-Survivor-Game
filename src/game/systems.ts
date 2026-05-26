@@ -2,7 +2,7 @@ import { upgrades } from '../content';
 import { playSound } from '../soundSystem';
 import { getCamera, getWorldView } from './camera';
 import { clamp, norm } from './math';
-import type { GameState, Upgrade, Vec } from './types';
+import type { EnemyKind, GameState, Upgrade, Vec } from './types';
 
 export function pickUpgrades(game: GameState) {
   game.upgrades = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 3);
@@ -87,14 +87,21 @@ function spawnEnemy(game: GameState) {
   pos.x = clamp(pos.x, -game.mapWidth / 2 + 24, game.mapWidth / 2 - 24);
   pos.y = clamp(pos.y, -game.mapHeight / 2 + 24, game.mapHeight / 2 - 24);
   const stagePower = game.stage - 1 + game.stageTime / game.stageDuration;
+  const kind: EnemyKind = game.stage > 1 && Math.random() < 0.25 ? 'goblin' : 'slime';
+  const slimeHp = 28 + stagePower * 8;
+  const slimeSpeed = 88 + stagePower * 7;
+  const slimeDamage = 12 + game.time * 0.12;
+  const isGoblin = kind === 'goblin';
   game.enemies.push({
     id: game.nextId++,
     x: pos.x,
     y: pos.y,
-    r: 13,
-    hp: 28 + stagePower * 8,
-    speed: 88 + stagePower * 7,
-    kind: 'slime',
+    r: isGoblin ? 15 : 13,
+    hp: isGoblin ? slimeHp * 2 : slimeHp,
+    speed: isGoblin ? slimeSpeed * 0.8 : slimeSpeed,
+    damage: isGoblin ? slimeDamage * 1.5 : slimeDamage,
+    gemDrops: isGoblin ? 2 : 1,
+    kind,
   });
 }
 
@@ -171,7 +178,9 @@ export function updateGame(game: GameState, dt: number, inputVector: () => Vec) 
   game.player.y = clamp(game.player.y, -game.mapHeight / 2 + game.player.r, game.mapHeight / 2 - game.player.r);
 
   game.spawnClock -= dt;
-  const spawnDelay = Math.max(0.16, 0.76 - (game.stage - 1) * 0.06 - game.stageTime * 0.002);
+  const stageSpawnGrowth = Math.pow(1.05, game.stage - 1);
+  const baselineSpawnDelay = 1.0857 - game.stageTime * 0.002;
+  const spawnDelay = Math.max(0.16, baselineSpawnDelay / stageSpawnGrowth);
   while (game.spawnClock <= 0) {
     spawnEnemy(game);
     game.spawnClock += spawnDelay;
@@ -188,7 +197,7 @@ export function updateGame(game: GameState, dt: number, inputVector: () => Vec) 
     enemy.x += toPlayer.x * enemy.speed * dt;
     enemy.y += toPlayer.y * enemy.speed * dt;
     if (Math.hypot(enemy.x - game.player.x, enemy.y - game.player.y) < enemy.r + game.player.r) {
-      game.player.hp -= (12 + game.time * 0.12) * dt * game.player.damageTakenMultiplier;
+      game.player.hp -= enemy.damage * dt * game.player.damageTakenMultiplier;
       enemy.x -= toPlayer.x * 18 * dt;
       enemy.y -= toPlayer.y * 18 * dt;
     }
@@ -216,8 +225,17 @@ export function updateGame(game: GameState, dt: number, inputVector: () => Vec) 
         }
         playSound('hit');
         if (enemy.hp <= 0) {
-          game.gems.push({ x: enemy.x, y: enemy.y, value: 4, r: 5 });
-          game.texts.push({ x: enemy.x, y: enemy.y, text: '+1', life: 0.7, color: '#9ee8ff' });
+          for (let i = 0; i < enemy.gemDrops; i += 1) {
+            const angle = (Math.PI * 2 * i) / enemy.gemDrops + enemy.id * 0.73;
+            const distance = enemy.gemDrops === 1 ? 0 : 12;
+            game.gems.push({
+              x: enemy.x + Math.cos(angle) * distance,
+              y: enemy.y + Math.sin(angle) * distance,
+              value: 4,
+              r: 5,
+            });
+          }
+          game.texts.push({ x: enemy.x, y: enemy.y, text: `+${enemy.gemDrops}`, life: 0.7, color: '#9ee8ff' });
         }
         break;
       }

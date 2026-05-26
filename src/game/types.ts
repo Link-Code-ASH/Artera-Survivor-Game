@@ -1,8 +1,18 @@
 export type Vec = { x: number; y: number };
 
-export type EnemyKind = 'slime';
+export type EnemyKind = 'slime' | 'goblin';
 
-export type Enemy = { id: number; x: number; y: number; r: number; hp: number; speed: number; kind: EnemyKind };
+export type Enemy = {
+  id: number;
+  x: number;
+  y: number;
+  r: number;
+  hp: number;
+  speed: number;
+  damage: number;
+  gemDrops: number;
+  kind: EnemyKind;
+};
 
 export type Bullet = {
   x: number;
