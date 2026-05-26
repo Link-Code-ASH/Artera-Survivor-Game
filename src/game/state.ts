@@ -1,0 +1,51 @@
+import { characters, weapons } from '../content';
+import type { CharacterDefinition, GameState, WeaponDefinition } from './types';
+
+export function newGame(width = 960, height = 540, character: CharacterDefinition = characters[0], weapon: WeaponDefinition = weapons[0]): GameState {
+  const baseSpeed = 190;
+  return {
+    status: 'ready',
+    width,
+    height,
+    time: 0,
+    stage: 1,
+    stageTime: 0,
+    stageDuration: 30,
+    mapWidth: 2200,
+    mapHeight: 1600,
+    rerollCost: 1,
+    nextId: 1,
+    spawnClock: 0,
+    shootClock: 0,
+    enemies: [],
+    bullets: [],
+    gems: [],
+    texts: [],
+    upgrades: [],
+    player: {
+      x: 0,
+      y: 0,
+      r: 20,
+      hp: 100,
+      maxHp: 100,
+      speed: baseSpeed,
+      damageTakenMultiplier: character.damageTakenMultiplier,
+      facing: 'right',
+      moving: false,
+      attackTimer: 0,
+      xp: 0,
+      nextXp: 18,
+      level: 1,
+      gemsCollected: 0,
+      upgradeCurrency: 0,
+      magnet: 82,
+      fireRate: weapon.fireRate,
+      bulletSpeed: weapon.bulletSpeed,
+      damage: weapon.damage,
+      projectiles: weapon.projectiles,
+      pierce: 0,
+      regen: 0,
+      knockback: 18,
+    },
+  };
+}

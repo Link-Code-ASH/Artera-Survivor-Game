@@ -256,10 +256,12 @@ input {
 .bars {
   position: absolute;
   z-index: 3;
-  right: 12px;
-  bottom: 12px;
+  top: 96px;
+  right: auto;
+  bottom: auto;
   left: 12px;
   display: grid;
+  width: min(320px, calc(100% - 24px));
   gap: 6px;
   pointer-events: none;
 }
@@ -284,6 +286,14 @@ input {
 
 .bar.xp span {
   background: linear-gradient(90deg, #57c7eb, #9af0bd);
+}
+
+.hud-bars {
+  padding: 8px;
+  border: 1px solid rgba(248, 220, 134, 0.16);
+  border-radius: 8px;
+  background: rgba(31, 33, 22, 0.62);
+  backdrop-filter: blur(12px);
 }
 
 .controls {
@@ -2072,6 +2082,208 @@ input {
   line-height: 1.35;
   text-align: center;
   text-shadow: 0 2px 3px rgba(0, 0, 0, 0.9);
+}
+
+.lounge-layer {
+  background:
+    linear-gradient(180deg, rgba(8, 14, 16, 0.9), rgba(12, 16, 11, 0.94)),
+    rgba(5, 7, 8, 0.9);
+  backdrop-filter: blur(6px);
+}
+
+.lounge-layer .upgrade-panel {
+  width: min(980px, 94vw);
+  min-height: min(660px, calc(100dvh - 32px));
+  aspect-ratio: auto;
+  align-content: start;
+  gap: clamp(18px, 3vw, 34px);
+  padding: clamp(22px, 4vw, 42px);
+  border: 1px solid rgba(248, 220, 134, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(255, 246, 223, 0.05), transparent 22%, transparent 78%, rgba(255, 246, 223, 0.04)),
+    linear-gradient(135deg, rgba(29, 45, 38, 0.94), rgba(45, 37, 25, 0.94));
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.54),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.lounge-header {
+  display: grid;
+  gap: 6px;
+  max-width: 640px;
+}
+
+.lounge-header span {
+  color: #9ee8ff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.lounge-header strong {
+  color: #fff6df;
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: 1;
+  text-shadow: 0 8px 18px rgba(0, 0, 0, 0.52);
+}
+
+.lounge-header p {
+  max-width: 520px;
+  margin: 0;
+  color: rgba(255, 246, 223, 0.72);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.lounge-header em {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 7px 10px;
+  border: 1px solid rgba(158, 232, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #9ee8ff;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.lounge-layer .upgrade-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+  justify-items: stretch;
+}
+
+.lounge-layer .upgrade-list button {
+  display: grid;
+  width: auto;
+  min-height: 220px;
+  aspect-ratio: auto;
+  align-content: end;
+  gap: 10px;
+  padding: 22px;
+  border: 1px solid rgba(248, 220, 134, 0.26);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 246, 223, 0.08), rgba(255, 246, 223, 0.02)),
+    rgba(16, 22, 18, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 34px rgba(0, 0, 0, 0.28);
+  filter: none;
+  text-align: left;
+}
+
+.lounge-layer .upgrade-list button:hover,
+.lounge-layer .upgrade-list button:focus-visible {
+  background:
+    linear-gradient(180deg, rgba(158, 232, 255, 0.14), rgba(255, 246, 223, 0.04)),
+    rgba(18, 28, 25, 0.94);
+  filter: none;
+  transform: translateY(-4px);
+}
+
+.lounge-layer .upgrade-list button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+.lounge-layer .upgrade-list strong,
+.lounge-layer .upgrade-list span,
+.lounge-layer .upgrade-list small {
+  position: static;
+  left: auto;
+  right: auto;
+  top: auto;
+  display: block;
+  text-align: left;
+}
+
+.lounge-layer .upgrade-list strong {
+  color: #ffe8ad;
+  font-size: 24px;
+  line-height: 1.12;
+}
+
+.lounge-layer .upgrade-list span {
+  color: rgba(255, 246, 223, 0.74);
+  font-size: 14px;
+}
+
+.lounge-layer .upgrade-list small {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(158, 232, 255, 0.12);
+  color: #9ee8ff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.lounge-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  gap: 8px;
+  padding: 24px;
+  border: 1px dashed rgba(248, 220, 134, 0.28);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(255, 246, 223, 0.78);
+  text-align: center;
+}
+
+.lounge-empty strong {
+  color: #ffe8ad;
+  font-size: 22px;
+}
+
+.lounge-empty span {
+  font-size: 14px;
+}
+
+.lounge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.lounge-reroll-button,
+.lounge-skip-button {
+  justify-self: center;
+  min-height: 42px;
+  padding: 10px 18px;
+  border: 1px solid rgba(255, 246, 223, 0.18);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 246, 223, 0.76);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.lounge-reroll-button {
+  border-color: rgba(158, 232, 255, 0.32);
+  background: rgba(158, 232, 255, 0.12);
+  color: #d9f7ff;
+}
+
+.lounge-reroll-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.lounge-reroll-button:hover:not(:disabled),
+.lounge-reroll-button:focus-visible:not(:disabled),
+.lounge-skip-button:hover,
+.lounge-skip-button:focus-visible {
+  outline: 0;
+  border-color: rgba(158, 232, 255, 0.42);
+  color: #fff6df;
 }
 
 @media (max-width: 720px) {

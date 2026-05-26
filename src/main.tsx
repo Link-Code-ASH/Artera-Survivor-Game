@@ -13,93 +13,17 @@ import {
 } from './saveSystem';
 import { isAudioUnlocked, playSound, startTitleMusic, unlockAudio } from './soundSystem';
 import { createSupabaseClient, hasSupabaseConfig, supabase } from './supabaseClient';
+import { characterDescription, characterName, characters, weaponDescription, weaponName, weapons } from './content';
+import { getCamera, getWorldView } from './game/camera';
+import { clamp, len, norm, seededNoise } from './game/math';
+import { newGame } from './game/state';
+import { applyUpgrade, rerollUpgrades, startNextStage, updateGame } from './game/systems';
+import type { Bullet, CharacterDefinition, Direction, Enemy, GameState, Gem, Upgrade, Vec, WeaponDefinition } from './game/types';
 import './styles.css';
-
-type Vec = { x: number; y: number };
-type EnemyKind = 'slime';
-type Enemy = { id: number; x: number; y: number; r: number; hp: number; speed: number; kind: EnemyKind };
-type Bullet = {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  damage: number;
-  pierce: number;
-  knockback: number;
-  hitIds: number[];
-};
-type Gem = { x: number; y: number; value: number; r: number };
-type FloatText = { x: number; y: number; text: string; life: number; color: string };
-type Upgrade = {
-  id: string;
-  title: string;
-  body: string;
-  apply: (game: GameState) => void;
-};
-
-type CharacterDefinition = {
-  id: string;
-  name: string;
-  description: string;
-  damageTakenMultiplier: number;
-};
-
-type WeaponDefinition = {
-  id: string;
-  name: string;
-  description: string;
-  projectileName: string;
-  fireRate: number;
-  bulletSpeed: number;
-  damage: number;
-  projectiles: number;
-};
-
-type Direction = 'down' | 'left' | 'right' | 'up';
-
-type GameState = {
-  status: 'ready' | 'running' | 'paused' | 'levelup' | 'gameover';
-  width: number;
-  height: number;
-  time: number;
-  nextId: number;
-  spawnClock: number;
-  shootClock: number;
-  player: {
-    x: number;
-    y: number;
-    r: number;
-    hp: number;
-    maxHp: number;
-    speed: number;
-    damageTakenMultiplier: number;
-    facing: Direction;
-    moving: boolean;
-    attackTimer: number;
-    xp: number;
-    nextXp: number;
-    level: number;
-    magnet: number;
-    fireRate: number;
-    bulletSpeed: number;
-    damage: number;
-    projectiles: number;
-    pierce: number;
-    regen: number;
-    knockback: number;
-  };
-  enemies: Enemy[];
-  bullets: Bullet[];
-  gems: Gem[];
-  texts: FloatText[];
-  upgrades: Upgrade[];
-};
 
 const keys = new Set<string>();
 const pointerMove: Vec = { x: 0, y: 0 };
 let pointerActive = false;
-let lastMoveDirection: Direction = 'down';
 
 type JoystickState = {
   active: boolean;
@@ -108,28 +32,6 @@ type JoystickState = {
   knobX: number;
   knobY: number;
 };
-
-const characters: CharacterDefinition[] = [
-  {
-    id: 'caiden',
-    name: '케이든',
-    description: '푸른 망토를 두른 아르테라의 젊은 수호자입니다.',
-    damageTakenMultiplier: 1,
-  },
-];
-
-const weapons: WeaponDefinition[] = [
-  {
-    id: 'magic-staff',
-    name: '마법 지팡이',
-    description: '응축한 마력을 파동으로 날립니다.',
-    projectileName: '마력파',
-    fireRate: 0.62,
-    bulletSpeed: 530,
-    damage: 18,
-    projectiles: 1,
-  },
-];
 
 const caidenAtlas = new Image();
 caidenAtlas.src = 'assets/images/characters/caiden-4dir.png';
@@ -145,302 +47,13 @@ const forestProps = new Image();
 forestProps.src = 'assets/images/maps/forest/props/forest-props.png';
 const forestSlimeAtlas = new Image();
 forestSlimeAtlas.src = 'assets/images/enemies/forest-slime-2dir.png';
-
-function characterName(character: CharacterDefinition) {
-  if (character.id === 'caiden') return '케이든';
-  return character.name;
-}
-
-function characterDescription(character: CharacterDefinition) {
-  if (character.id === 'caiden') return '푸른 망토를 두른 아르테라의 젊은 수호자입니다.';
-  return character.description;
-}
-
-function weaponName(weapon: WeaponDefinition) {
-  if (weapon.id === 'magic-staff') return '마법 지팡이';
-  return weapon.name;
-}
-
-function weaponDescription(weapon: WeaponDefinition) {
-  if (weapon.id === 'magic-staff') return '응축한 마력을 파동으로 날립니다.';
-  return weapon.description;
-}
-
-const upgrades: Upgrade[] = [
-  {
-    id: 'rapid',
-    title: '비전 서책',
-    body: '마력파를 더 자주 발사합니다.',
-    apply: (game) => {
-      game.player.fireRate = Math.max(0.18, game.player.fireRate * 0.84);
-    },
-  },
-  {
-    id: 'damage',
-    title: '룬 각인',
-    body: '마력파의 피해량이 증가합니다.',
-    apply: (game) => {
-      game.player.damage += 7;
-    },
-  },
-  {
-    id: 'projectile',
-    title: '쌍월 주문',
-    body: '한 번에 발사하는 마력파가 늘어납니다.',
-    apply: (game) => {
-      game.player.projectiles += 1;
-    },
-  },
-  {
-    id: 'speed',
-    title: '순풍 망토',
-    body: '이동 속도가 증가합니다.',
-    apply: (game) => {
-      game.player.speed += 18;
-    },
-  },
-  {
-    id: 'magnet',
-    title: '수정 부적',
-    body: '마력 수정을 더 멀리서 끌어옵니다.',
-    apply: (game) => {
-      game.player.magnet += 34;
-    },
-  },
-  {
-    id: 'heart',
-    title: '성소의 축복',
-    body: '최대 체력과 현재 체력이 회복됩니다.',
-    apply: (game) => {
-      game.player.maxHp += 22;
-      game.player.hp = Math.min(game.player.maxHp, game.player.hp + 36);
-    },
-  },
-  {
-    id: 'pierce',
-    title: '관통의 룬',
-    body: '마력파가 적을 추가로 관통합니다.',
-    apply: (game) => {
-      game.player.pierce += 1;
-    },
-  },
-  {
-    id: 'velocity',
-    title: '푸른 혜성',
-    body: '마력파가 더 빠르게 날아가고 조금 강해집니다.',
-    apply: (game) => {
-      game.player.bulletSpeed += 95;
-      game.player.damage += 3;
-    },
-  },
-  {
-    id: 'barrier',
-    title: '수호 결계',
-    body: '받는 피해가 감소합니다.',
-    apply: (game) => {
-      game.player.damageTakenMultiplier = Math.max(0.45, game.player.damageTakenMultiplier * 0.86);
-    },
-  },
-  {
-    id: 'regen',
-    title: '생명의 서약',
-    body: '전투 중 체력이 천천히 회복됩니다.',
-    apply: (game) => {
-      game.player.regen += 1.1;
-    },
-  },
-  {
-    id: 'knockback',
-    title: '충격 파동',
-    body: '마력파가 적을 더 강하게 밀쳐냅니다.',
-    apply: (game) => {
-      game.player.knockback += 20;
-    },
-  },
-  {
-    id: 'overload',
-    title: '마력 과부하',
-    body: '피해량과 발사 속도가 함께 증가합니다.',
-    apply: (game) => {
-      game.player.damage += 5;
-      game.player.fireRate = Math.max(0.18, game.player.fireRate * 0.9);
-    },
-  },
-];
-
-function newGame(width = 960, height = 540, character: CharacterDefinition = characters[0], weapon: WeaponDefinition = weapons[0]): GameState {
-  const baseSpeed = 190;
-  return {
-    status: 'ready',
-    width,
-    height,
-    time: 0,
-    nextId: 1,
-    spawnClock: 0,
-    shootClock: 0,
-    enemies: [],
-    bullets: [],
-    gems: [],
-    texts: [],
-    upgrades: [],
-    player: {
-      x: 0,
-      y: 0,
-      r: 16,
-      hp: 100,
-      maxHp: 100,
-      speed: baseSpeed,
-      damageTakenMultiplier: character.damageTakenMultiplier,
-      facing: 'right',
-      moving: false,
-      attackTimer: 0,
-      xp: 0,
-      nextXp: 18,
-      level: 1,
-      magnet: 82,
-      fireRate: weapon.fireRate,
-      bulletSpeed: weapon.bulletSpeed,
-      damage: weapon.damage,
-      projectiles: weapon.projectiles,
-      pierce: 0,
-      regen: 0,
-      knockback: 18,
-    },
-  };
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function len(v: Vec) {
-  return Math.hypot(v.x, v.y);
-}
-
-function norm(v: Vec): Vec {
-  const l = len(v) || 1;
-  return { x: v.x / l, y: v.y / l };
-}
-
-function getCameraScale(game: GameState) {
-  const shortSide = Math.min(game.width, game.height);
-  if (shortSide <= 520) return 0.74;
-  if (shortSide <= 720) return 0.84;
-  return 1;
-}
-
-function getWorldView(game: GameState) {
-  const scale = getCameraScale(game);
-  return {
-    scale,
-    width: game.width / scale,
-    height: game.height / scale,
-  };
-}
-
-function getCamera(game: GameState): Vec {
-  const view = getWorldView(game);
-  return {
-    x: game.player.x - view.width / 2,
-    y: game.player.y - view.height / 2,
-  };
-}
-
-function seededNoise(x: number, y: number) {
-  const value = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-  return value - Math.floor(value);
-}
+const xpGemImage = new Image();
+xpGemImage.src = 'assets/images/items/gems/xp-gem-small.png';
 
 function requestFullScreen() {
   const root = document.documentElement;
   if (!document.fullscreenElement && root.requestFullscreen) {
     root.requestFullscreen().catch(() => undefined);
-  }
-}
-
-function pickUpgrades(game: GameState) {
-  game.upgrades = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 3);
-  game.status = 'levelup';
-}
-
-function spawnEnemy(game: GameState) {
-  const camera = getCamera(game);
-  const view = getWorldView(game);
-  const margin = 90;
-  const side = Math.floor(Math.random() * 4);
-  const pos = { x: game.player.x, y: game.player.y };
-  if (side === 0) {
-    pos.x = camera.x - margin;
-    pos.y = camera.y + Math.random() * view.height;
-  } else if (side === 1) {
-    pos.x = camera.x + view.width + margin;
-    pos.y = camera.y + Math.random() * view.height;
-  } else if (side === 2) {
-    pos.x = camera.x + Math.random() * view.width;
-    pos.y = camera.y - margin;
-  } else {
-    pos.x = camera.x + Math.random() * view.width;
-    pos.y = camera.y + view.height + margin;
-  }
-  const minutes = game.time / 60;
-  game.enemies.push({
-    id: game.nextId++,
-    x: pos.x,
-    y: pos.y,
-    r: 13,
-    hp: 28 + minutes * 8,
-    speed: 88 + minutes * 7,
-    kind: 'slime',
-  });
-}
-
-function nearestEnemy(game: GameState) {
-  let target: Enemy | undefined;
-  let best = Infinity;
-  for (const enemy of game.enemies) {
-    const d = Math.hypot(enemy.x - game.player.x, enemy.y - game.player.y);
-    if (d < best) {
-      best = d;
-      target = enemy;
-    }
-  }
-  return target;
-}
-
-function shoot(game: GameState) {
-  const target = nearestEnemy(game);
-  if (!target) return;
-  playSound('shoot');
-  game.player.attackTimer = 0.22;
-  const base = Math.atan2(target.y - game.player.y, target.x - game.player.x);
-  const count = game.player.projectiles;
-  const spread = count === 1 ? 0 : 0.22;
-  for (let i = 0; i < count; i += 1) {
-    const angle = base + (i - (count - 1) / 2) * spread;
-    game.bullets.push({
-      x: game.player.x,
-      y: game.player.y,
-      vx: Math.cos(angle) * game.player.bulletSpeed,
-      vy: Math.sin(angle) * game.player.bulletSpeed,
-      life: 1.15,
-      damage: game.player.damage,
-      pierce: game.player.pierce,
-      knockback: game.player.knockback,
-      hitIds: [],
-    });
-  }
-}
-
-function gainXp(game: GameState, amount: number) {
-  game.player.xp += amount;
-  while (game.player.xp >= game.player.nextXp) {
-    game.player.xp -= game.player.nextXp;
-    game.player.level += 1;
-    game.player.nextXp = Math.floor(game.player.nextXp * 1.28 + 7);
-    game.texts.push({ x: game.player.x, y: game.player.y - 30, text: 'LEVEL UP', life: 1, color: '#f8dc86' });
-    playSound('levelup');
-    pickUpgrades(game);
-    break;
   }
 }
 
@@ -458,116 +71,7 @@ function inputVector(): Vec {
     v.x += pointerMove.x;
     v.y += pointerMove.y;
   }
-  const next = len(v) > 1 ? norm(v) : v;
-  if (Math.abs(next.x) > 0.04 || Math.abs(next.y) > 0.04) {
-    if (Math.abs(next.x) > Math.abs(next.y)) {
-      lastMoveDirection = next.x < 0 ? 'left' : 'right';
-    } else {
-      lastMoveDirection = next.y < 0 ? 'up' : 'down';
-    }
-  }
-  return next;
-}
-
-function updateGame(game: GameState, dt: number) {
-  if (game.status !== 'running') return;
-  game.time += dt;
-
-  const move = inputVector();
-  game.player.moving = Math.abs(move.x) > 0.04 || Math.abs(move.y) > 0.04;
-  game.player.facing = lastMoveDirection;
-  game.player.attackTimer = Math.max(0, game.player.attackTimer - dt);
-  if (game.player.regen > 0) {
-    game.player.hp = Math.min(game.player.maxHp, game.player.hp + game.player.regen * dt);
-  }
-  game.player.x += move.x * game.player.speed * dt;
-  game.player.y += move.y * game.player.speed * dt;
-
-  game.spawnClock -= dt;
-  const spawnDelay = Math.max(0.16, 0.76 - game.time * 0.006);
-  while (game.spawnClock <= 0) {
-    spawnEnemy(game);
-    game.spawnClock += spawnDelay;
-  }
-
-  game.shootClock -= dt;
-  if (game.shootClock <= 0) {
-    shoot(game);
-    game.shootClock = game.player.fireRate;
-  }
-
-  for (const enemy of game.enemies) {
-    const toPlayer = norm({ x: game.player.x - enemy.x, y: game.player.y - enemy.y });
-    enemy.x += toPlayer.x * enemy.speed * dt;
-    enemy.y += toPlayer.y * enemy.speed * dt;
-    if (Math.hypot(enemy.x - game.player.x, enemy.y - game.player.y) < enemy.r + game.player.r) {
-      game.player.hp -= (12 + game.time * 0.12) * dt * game.player.damageTakenMultiplier;
-      enemy.x -= toPlayer.x * 18 * dt;
-      enemy.y -= toPlayer.y * 18 * dt;
-    }
-  }
-
-  for (const bullet of game.bullets) {
-    bullet.x += bullet.vx * dt;
-    bullet.y += bullet.vy * dt;
-    bullet.life -= dt;
-  }
-
-  for (const bullet of game.bullets) {
-    if (bullet.life <= 0) continue;
-    for (const enemy of game.enemies) {
-      if (enemy.hp <= 0) continue;
-      if (bullet.hitIds.includes(enemy.id)) continue;
-      if (Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y) < enemy.r + 5) {
-        enemy.hp -= bullet.damage;
-        bullet.hitIds.push(enemy.id);
-        const push = norm({ x: bullet.vx, y: bullet.vy });
-        enemy.x += push.x * bullet.knockback;
-        enemy.y += push.y * bullet.knockback;
-        if (bullet.hitIds.length > bullet.pierce) {
-          bullet.life = 0;
-        }
-        playSound('hit');
-        if (enemy.hp <= 0) {
-          game.gems.push({ x: enemy.x, y: enemy.y, value: 4, r: 5 });
-          game.texts.push({ x: enemy.x, y: enemy.y, text: '+4', life: 0.7, color: '#9ee8ff' });
-        }
-        break;
-      }
-    }
-  }
-
-  for (const gem of game.gems) {
-    const d = Math.hypot(gem.x - game.player.x, gem.y - game.player.y);
-    if (d < game.player.magnet) {
-      const pull = norm({ x: game.player.x - gem.x, y: game.player.y - gem.y });
-      const speed = clamp(360 - d, 120, 520);
-      gem.x += pull.x * speed * dt;
-      gem.y += pull.y * speed * dt;
-    }
-    if (d < game.player.r + gem.r) {
-      gem.value = -gem.value;
-      playSound('pickup');
-      gainXp(game, Math.abs(gem.value));
-    }
-  }
-
-  for (const text of game.texts) {
-    text.y -= 28 * dt;
-    text.life -= dt;
-  }
-
-  game.bullets = game.bullets.filter((b) => b.life > 0 && Math.hypot(b.x - game.player.x, b.y - game.player.y) < 1300);
-  game.enemies = game.enemies.filter((e) => Math.hypot(e.x - game.player.x, e.y - game.player.y) < 1800);
-  game.enemies = game.enemies.filter((e) => e.hp > 0);
-  game.gems = game.gems.filter((g) => g.value > 0);
-  game.texts = game.texts.filter((t) => t.life > 0);
-
-  if (game.player.hp <= 0 && game.status !== 'gameover') {
-    game.player.hp = 0;
-    game.status = 'gameover';
-    playSound('gameover');
-  }
+  return len(v) > 1 ? norm(v) : v;
 }
 
 function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
@@ -602,6 +106,9 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
   if (game.status === 'paused') {
     drawCenterMessage(ctx, game, 'PAUSED', '성소의 숨결이 잠시 멈췄습니다');
   }
+  if (game.status === 'lounge') {
+    drawCenterMessage(ctx, game, 'WAITING ROOM', '보석으로 능력을 구매하고 다음 스테이지를 준비합니다');
+  }
   if (game.status === 'gameover') {
     drawCenterMessage(ctx, game, 'GAME OVER', `${formatTime(game.time)} 생존`);
   }
@@ -610,6 +117,20 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
 function drawMap(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
   drawForestGround(ctx, game, camera);
   drawForestProps(ctx, game, camera);
+  drawMapBounds(ctx, game, camera);
+}
+
+function drawMapBounds(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
+  const left = -game.mapWidth / 2 - camera.x;
+  const top = -game.mapHeight / 2 - camera.y;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(248, 220, 134, 0.42)';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(left, top, game.mapWidth, game.mapHeight);
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.32)';
+  ctx.lineWidth = 18;
+  ctx.strokeRect(left - 9, top - 9, game.mapWidth + 18, game.mapHeight + 18);
+  ctx.restore();
 }
 
 function drawForestGround(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
@@ -762,6 +283,16 @@ function drawForestProps(ctx: CanvasRenderingContext2D, game: GameState, camera:
 }
 
 function drawCrystal(ctx: CanvasRenderingContext2D, gem: Gem) {
+  if (xpGemImage.complete && xpGemImage.naturalWidth > 0) {
+    const size = gem.r * 4.83;
+    ctx.save();
+    ctx.shadowColor = 'rgba(117, 217, 255, 0.7)';
+    ctx.shadowBlur = 12;
+    ctx.drawImage(xpGemImage, gem.x - size / 2, gem.y - size / 2, size, size);
+    ctx.restore();
+    return;
+  }
+
   ctx.fillStyle = '#75d9ff';
   ctx.strokeStyle = '#d8f5ff';
   ctx.lineWidth = 1;
@@ -982,6 +513,10 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   const start = () => {
     unlockAudio();
     playSound('button');
+    if (gameRef.current.status === 'lounge') {
+      syncSnapshot();
+      return;
+    }
     requestFullScreen();
     if (gameRef.current.status === 'gameover') {
       gameRef.current = newGame(gameRef.current.width, gameRef.current.height, selectedCharacter, selectedWeapon);
@@ -1047,12 +582,12 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
       const last = lastRef.current || now;
       const dt = Math.min(0.033, (now - last) / 1000);
       lastRef.current = now;
-      updateGame(gameRef.current, dt);
+      updateGame(gameRef.current, dt, inputVector);
       if (gameRef.current.status === 'gameover' && !savedGameOverRef.current) {
         savedGameOverRef.current = true;
         const nextSaveData = recordRun(saveData, {
           time: gameRef.current.time,
-          level: gameRef.current.player.level,
+          level: gameRef.current.stage,
         });
         setSaveData(nextSaveData);
         if (saveSession) {
@@ -1091,9 +626,20 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
     unlockAudio();
     playSound('select');
     const game = gameRef.current;
-    upgrade.apply(game);
-    game.upgrades = [];
-    game.status = 'running';
+    applyUpgrade(game, upgrade);
+    syncSnapshot();
+  };
+
+  const skipLoungeUpgrade = () => {
+    unlockAudio();
+    playSound('button');
+    startNextStage(gameRef.current);
+    syncSnapshot();
+  };
+
+  const rerollLoungeUpgrades = () => {
+    unlockAudio();
+    rerollUpgrades(gameRef.current);
     syncSnapshot();
   };
 
@@ -1291,16 +837,24 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
 
         <div className="hud top">
           <div>
-            <strong>{formatTime(snapshot.time)}</strong>
-            <span>생존</span>
+            <strong>{formatTime(Math.max(0, snapshot.stageDuration - snapshot.stageTime))}</strong>
+            <span>남은 시간</span>
           </div>
           <div>
-            <strong>Lv {snapshot.player.level}</strong>
-            <span>레벨</span>
+            <strong>Stage {snapshot.stage}</strong>
+            <span>스테이지</span>
           </div>
           <div>
             <strong>{snapshot.enemies.length}</strong>
             <span>적</span>
+          </div>
+          <div>
+            <strong>{snapshot.player.gemsCollected}</strong>
+            <span>보석</span>
+          </div>
+          <div>
+            <strong>{snapshot.player.upgradeCurrency}</strong>
+            <span>재화</span>
           </div>
         </div>
 
@@ -1309,7 +863,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
           <span>Runs {saveData.stats.totalRuns} · Best {formatTime(saveData.stats.bestTime)} · Best Lv {saveData.stats.bestLevel}</span>
         </div>
 
-        <div className="bars">
+        <div className="bars hud-bars">
           <div className="bar hp">
             <span style={{ width: `${(snapshot.player.hp / snapshot.player.maxHp) * 100}%` }} />
           </div>
@@ -1331,7 +885,11 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
               <LogOut size={20} />
             </button>
           )}
-          <button onClick={snapshot.status === 'running' ? togglePause : start} aria-label={snapshot.status === 'running' ? '일시정지' : '시작'}>
+          <button
+            onClick={snapshot.status === 'running' ? togglePause : start}
+            disabled={snapshot.status === 'lounge'}
+            aria-label={snapshot.status === 'running' ? '일시정지' : '시작'}
+          >
             {snapshot.status === 'running' ? <Pause size={20} /> : <Play size={20} />}
           </button>
           <button
@@ -1349,17 +907,52 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
           </button>
         </div>
 
-        {snapshot.status === 'levelup' && (
-          <div className="upgrade-layer">
+        {(snapshot.status === 'levelup' || snapshot.status === 'lounge') && (
+          <div className={`upgrade-layer ${snapshot.status === 'lounge' ? 'lounge-layer' : ''}`}>
             <div className="upgrade-panel">
+              {snapshot.status === 'lounge' && (
+                <div className="lounge-header">
+                  <span>Stage {snapshot.stage} Clear</span>
+                  <strong>대기실</strong>
+                  <p>수집한 보석으로 능력을 구매하고 다음 스테이지로 이동합니다.</p>
+                  <em>보유 보석 {snapshot.player.upgradeCurrency} · 초기화 {snapshot.rerollCost}</em>
+                </div>
+              )}
               <div className="upgrade-list">
                 {snapshot.upgrades.map((upgrade) => (
-                  <button key={upgrade.id} data-upgrade={upgrade.id} onClick={() => chooseUpgrade(upgrade)}>
+                  <button
+                    key={upgrade.id}
+                    data-upgrade={upgrade.id}
+                    disabled={snapshot.status === 'lounge' && snapshot.player.upgradeCurrency < upgrade.cost}
+                    onClick={() => chooseUpgrade(upgrade)}
+                  >
                     <strong>{upgrade.title}</strong>
                     <span>{upgrade.body}</span>
+                    {snapshot.status === 'lounge' && <small>{upgrade.cost} 보석</small>}
                   </button>
                 ))}
+                {snapshot.status === 'lounge' && snapshot.upgrades.length === 0 && (
+                  <div className="lounge-empty">
+                    <strong>선택지를 모두 구매했습니다</strong>
+                    <span>초기화해서 새 선택지를 뽑거나 다음 스테이지로 이동하세요.</span>
+                  </div>
+                )}
               </div>
+              {snapshot.status === 'lounge' && (
+                <div className="lounge-actions">
+                  <button
+                    className="lounge-reroll-button"
+                    type="button"
+                    disabled={snapshot.player.upgradeCurrency < snapshot.rerollCost}
+                    onClick={rerollLoungeUpgrades}
+                  >
+                    선택지 초기화 · {snapshot.rerollCost} 보석
+                  </button>
+                  <button className="lounge-skip-button" type="button" onClick={skipLoungeUpgrade}>
+                    다음 스테이지
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
