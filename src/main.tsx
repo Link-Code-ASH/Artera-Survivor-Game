@@ -377,7 +377,10 @@ function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy, game: GameState)
 function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
   const p = game.player;
   if (caidenAtlas.complete && caidenAtlas.naturalWidth > 0) {
-    const frameSize = caidenAtlas.naturalWidth / 4;
+    const columns = 4;
+    const rows = 4;
+    const sourceWidth = caidenAtlas.naturalWidth / columns;
+    const sourceHeight = caidenAtlas.naturalHeight / rows;
     const frame = p.moving ? Math.floor(game.time * 8) % 4 : 0;
     const rowByDirection: Record<Direction, number> = {
       down: 0,
@@ -386,11 +389,8 @@ function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
       up: 3,
     };
     const row = rowByDirection[p.facing];
-    const sourceX = Math.floor(frame * frameSize);
-    const upExtra = p.facing === 'up' ? 48 : 0;
-    const sourceY = Math.max(0, Math.floor(row * frameSize) - upExtra);
-    const sourceWidth = Math.ceil(frameSize);
-    const sourceHeight = Math.ceil(frameSize) + upExtra;
+    const sourceX = Math.floor(frame * sourceWidth);
+    const sourceY = Math.floor(row * sourceHeight);
     const heroScale = 1.56;
     const drawWidth = 74 * heroScale;
     const drawHeight = (p.facing === 'up' ? 86 : 74) * heroScale;
@@ -401,21 +401,32 @@ function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
     if (p.facing === 'right') {
       ctx.scale(-1, 1);
     }
-    ctx.drawImage(
-      caidenAtlas,
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
-      -drawWidth / 2,
-      0,
-      drawWidth,
-      drawHeight,
-    );
+    try {
+      ctx.drawImage(
+        caidenAtlas,
+        sourceX,
+        sourceY,
+        Math.ceil(sourceWidth),
+        Math.ceil(sourceHeight),
+        -drawWidth / 2,
+        0,
+        drawWidth,
+        drawHeight,
+      );
+    } catch {
+      ctx.restore();
+      drawHeroFallback(ctx, game);
+      return;
+    }
     ctx.restore();
     return;
   }
 
+  drawHeroFallback(ctx, game);
+}
+
+function drawHeroFallback(ctx: CanvasRenderingContext2D, game: GameState) {
+  const p = game.player;
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
