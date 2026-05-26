@@ -31,7 +31,7 @@ The project started as a single-file prototype, but core data and gameplay logic
 - `src/content/upgrades.ts`: Upgrade definitions and upgrade effects.
 - `src/content/index.ts`: Re-exports content modules for easier imports.
 - `src/saveSystem.ts`: Save data structure, normalization, run stat recording, and Supabase RPC calls.
-- `src/soundSystem.ts`: Web Audio sound effects and title music.
+- `src/soundSystem.ts`: Web Audio sound effects. Background music is currently disabled.
 - `src/supabaseClient.ts`: Supabase client creation.
 - `src/styles.css`: App layout, menus, HUD, overlays, and selection screen styling.
 - `public/assets`: Images and sounds served from the web root.
@@ -47,6 +47,8 @@ The project started as a single-file prototype, but core data and gameplay logic
 ## Rendering Model
 - The world, player, enemies, projectiles, gems, and center messages are drawn on canvas.
 - Title, character selection, weapon selection, HUD, controls, level-up cards, joystick, and security settings are DOM overlays.
+- The security settings toggle should only be exposed from the title screen so gameplay and selection screens stay clean.
+- The UI baseline is now portrait smartphone orientation. Desktop and laptop displays should present the game inside a centered portrait play area instead of treating landscape as the primary layout.
 
 ## Implementation Preference
 Keep new work compatible with the split structure. Temporary functional implementations are acceptable when they make later user tuning easier.

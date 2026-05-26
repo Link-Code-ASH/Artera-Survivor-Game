@@ -3,8 +3,6 @@ type SoundName = 'shoot' | 'hit' | 'pickup' | 'levelup' | 'gameover' | 'select' 
 let audioContext: AudioContext | null = null;
 let enabled = false;
 const masterGain = 12;
-let titleMusicTimer: number | null = null;
-let titleMusicStep = 0;
 
 function getAudioContext() {
   if (!audioContext) {
@@ -21,10 +19,6 @@ export function unlockAudio() {
   if (context.state === 'suspended') {
     context.resume().catch(() => undefined);
   }
-}
-
-export function isAudioUnlocked() {
-  return enabled;
 }
 
 function tone(
@@ -141,36 +135,4 @@ export function playSound(name: SoundName) {
     tone(740, 0.09, 'sine', 0.024, 0.035, 520, 0.12);
     noise(0.06, 0.01, 0.01, 1400);
   }
-}
-
-export function startTitleMusic() {
-  if (!enabled || titleMusicTimer !== null) return;
-  const progression = [
-    [55, 110, 164.81, 220],
-    [49, 98, 146.83, 196],
-    [65.41, 130.81, 196, 261.63],
-    [73.42, 146.83, 220, 293.66],
-  ];
-  const playStep = () => {
-    const chord = progression[titleMusicStep % progression.length];
-    tone(chord[0] / 2, 1.8, 'sine', 0.007, 0, chord[0] / 2);
-    tone(chord[0], 1.7, 'triangle', 0.007, 0.02, chord[0] * 0.99);
-    tone(chord[1], 1.6, 'sawtooth', 0.004, 0.05, chord[1] * 1.005, -0.18);
-    tone(chord[2], 1.45, 'triangle', 0.0045, 0.1, chord[2] * 0.997, 0.16);
-    tone(chord[3], 1.3, 'sine', 0.0035, 0.18, chord[3] * 1.004);
-    if (titleMusicStep % 2 === 1) {
-      tone(chord[2] * 2, 0.7, 'triangle', 0.0026, 0.32, chord[2] * 1.96, 0.08);
-    }
-    noise(0.34, 0.0012, 0.08, 520);
-    titleMusicStep += 1;
-  };
-  playStep();
-  titleMusicTimer = window.setInterval(playStep, 1550);
-}
-
-export function stopTitleMusic() {
-  if (titleMusicTimer === null) return;
-  window.clearInterval(titleMusicTimer);
-  titleMusicTimer = null;
-  titleMusicStep = 0;
 }

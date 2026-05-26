@@ -11,6 +11,7 @@ export function newGame(width = 960, height = 540, character: CharacterDefinitio
     stage: 1,
     stageTime: 0,
     stageDuration: 30,
+    stageClearTimer: 0,
     mapWidth: 2200,
     mapHeight: 1600,
     rerollCost: 1,
@@ -22,6 +23,7 @@ export function newGame(width = 960, height = 540, character: CharacterDefinitio
     gems: [],
     texts: [],
     upgrades: [],
+    upgradeLevels: {},
     player: {
       x: 0,
       y: 0,
@@ -46,6 +48,17 @@ export function newGame(width = 960, height = 540, character: CharacterDefinitio
       pierce: 0,
       regen: 0,
       knockback: 18,
+      bulletLife: 1.15,
+      splashDamage: 0,
+      splashRadius: 0,
+      slowChance: 0,
+      slowMultiplier: 1,
+      slowDuration: 0,
+      thornsDamage: 0,
+      dotDamage: 0,
+      dotDuration: 0,
+      homing: 0,
+      doubleGemChance: 0,
     },
   };
 }

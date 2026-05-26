@@ -17,7 +17,7 @@ Current character:
 When adding a character, update:
 - Character definition list.
 - Save defaults and unlocks if the character should be selectable.
-- Character selection slots.
+- Character selection grid slots.
 - Character art assets and rendering if needed.
 
 ## Weapons
@@ -29,7 +29,7 @@ Current weapon:
 When adding a weapon, update:
 - Weapon definition list.
 - Save defaults and unlocks if the weapon should be selectable.
-- Weapon selection slots.
+- Weapon selection grid slots.
 - Weapon icon/projectile assets and rendering if needed.
 
 ## Enemies
@@ -58,9 +58,13 @@ When adding enemies, update:
 - Any related assets.
 
 ## Upgrades
-Upgrades are defined in `src/content/upgrades.ts` as `Upgrade`.
+Upgrades are defined in `src/content/upgrades.ts` as upgrade families that generate `Upgrade` entries.
 
-In the current stage-based flow, upgrades are purchased in the waiting room with collected XP gems. The first-pass implementation uses a shared gem cost for all upgrades so the loop can be tested before final balance and rarity rules are designed.
+When the user asks to add a new upgrade mechanic, Codex should choose a fitting fantasy name and temporary tuning values, document the mechanic, and implement a functional first pass. Exact names, numbers, and presentation can be refined later.
+
+In the current stage-based flow, upgrades are purchased in the waiting room with collected XP gems. Each upgrade family has 5 tiers. Tier names append Roman numerals `I`, `II`, `III`, `IV`, and `V`, and tier costs are `3`, `5`, `7`, `9`, and `11` gems.
+
+Only the next unpurchased tier of each upgrade family can appear. For example, after buying `수호 결계 I`, the next offer for that family becomes `수호 결계 II`. Fully purchased families stop appearing.
 
 Waiting-room choices can be rerolled. The first reroll costs 1 gem, and each reroll increases the next reroll cost by 1 during that waiting-room visit.
 
@@ -68,18 +72,25 @@ The player can buy multiple waiting-room upgrades as long as they have enough ge
 
 Because HP is fully restored when starting the next stage, direct healing and passive regeneration upgrades should not appear in the current first-pass pool.
 
-Current upgrade effects include:
-- Faster fire rate.
-- More damage.
-- More projectiles.
-- More movement speed.
-- Larger magnet range.
-- More max HP.
-- More pierce.
-- Faster projectile speed.
-- Reduced damage taken.
-- More knockback.
-- Mixed damage and fire rate increase.
+Current upgrade families:
+- `rapid`: `비전 속삭임`, faster fire rate.
+- `damage`: `룬 각인`, more projectile damage.
+- `projectile`: `쌍월 주문`, more projectiles.
+- `speed`: `질풍 망토`, more movement speed.
+- `magnet`: `수정 부름`, larger gem pickup range.
+- `heart`: `성소의 축복`, more max HP.
+- `pierce`: `관통의 룬`, more projectile pierce.
+- `velocity`: `빠른 혜성`, faster projectile speed plus small damage.
+- `barrier`: `수호 결계`, reduced damage taken.
+- `knockback`: `충격 파동`, stronger projectile knockback.
+- `overload`: `마력 과부하`, mixed damage and fire-rate increase.
+- `range`: `별빛 사거리`, longer projectile lifetime and effective range.
+- `splash`: `파열의 낙인`, splash damage when an enemy is defeated.
+- `slow`: `서리 족쇄`, chance to slow enemies on hit.
+- `thorns`: `거울 갑주`, reflection damage while enemies are touching the player.
+- `dot`: `잔불 저주`, damage over time on hit.
+- `homing`: `추적의 별`, projectiles steer toward enemies.
+- `double-gem`: `탐욕의 별잔`, chance for collected gems to count double.
 
 ## Upgrade Pool Structure
 Upgrades should be organized by weapon category so future weapons can share some choices while also having category-specific choices.

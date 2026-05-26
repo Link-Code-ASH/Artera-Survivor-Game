@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { LogOut, Maximize, Pause, Play, RotateCcw } from 'lucide-react';
+import { Maximize, Pause, Play } from 'lucide-react';
 import {
   createDefaultSaveData,
   loadGameSave,
@@ -11,7 +11,7 @@ import {
   type SyncCredentials,
   verifyGameSync,
 } from './saveSystem';
-import { isAudioUnlocked, playSound, startTitleMusic, unlockAudio } from './soundSystem';
+import { playSound, unlockAudio } from './soundSystem';
 import { createSupabaseClient, hasSupabaseConfig, supabase } from './supabaseClient';
 import { characterDescription, characterName, characters, weaponDescription, weaponName, weapons } from './content';
 import { getCamera, getWorldView } from './game/camera';
@@ -108,12 +108,74 @@ function drawGame(ctx: CanvasRenderingContext2D, game: GameState) {
   if (game.status === 'paused') {
     drawCenterMessage(ctx, game, 'PAUSED', '성소의 숨결이 잠시 멈췄습니다');
   }
+  if (game.status === 'stageClear') {
+    drawCenterMessage(ctx, game, `STAGE ${game.stage} CLEAR`, '잠시 후 대기실로 이동합니다');
+  }
   if (game.status === 'lounge') {
-    drawCenterMessage(ctx, game, 'WAITING ROOM', '보석으로 능력을 구매하고 다음 스테이지를 준비합니다');
+    drawLoungeBackdrop(ctx, game);
   }
   if (game.status === 'gameover') {
     drawCenterMessage(ctx, game, 'GAME OVER', `${formatTime(game.time)} 생존`);
   }
+}
+
+function drawLoungeBackdrop(ctx: CanvasRenderingContext2D, game: GameState) {
+  const width = game.width;
+  const height = game.height;
+  const centerX = width / 2;
+  const centerY = height * 0.48;
+
+  const bg = ctx.createLinearGradient(0, 0, 0, height);
+  bg.addColorStop(0, '#182414');
+  bg.addColorStop(0.5, '#111713');
+  bg.addColorStop(1, '#060806');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, width, height);
+
+  const glow = ctx.createRadialGradient(centerX, centerY, 20, centerX, centerY, Math.max(width, height) * 0.7);
+  glow.addColorStop(0, 'rgba(248, 220, 134, 0.22)');
+  glow.addColorStop(0.32, 'rgba(81, 153, 255, 0.12)');
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.strokeStyle = 'rgba(248, 220, 134, 0.22)';
+  ctx.lineWidth = 2;
+  for (let ring = 0; ring < 4; ring += 1) {
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.min(width, height) * (0.16 + ring * 0.085), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = 'rgba(116, 202, 255, 0.14)';
+  for (let i = 0; i < 12; i += 1) {
+    const angle = (Math.PI * 2 * i) / 12;
+    const inner = Math.min(width, height) * 0.12;
+    const outer = Math.min(width, height) * 0.43;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+    ctx.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = 'rgba(255, 232, 173, 0.34)';
+  ctx.font = `${Math.max(14, Math.min(22, width * 0.045))}px serif`;
+  ctx.textAlign = 'center';
+  const runes = ['ᚱ', 'ᚨ', 'ᛏ', 'ᛖ', 'ᚱ', 'ᚨ'];
+  for (let i = 0; i < runes.length; i += 1) {
+    const angle = (Math.PI * 2 * i) / runes.length - Math.PI / 2;
+    const radius = Math.min(width, height) * 0.29;
+    ctx.fillText(runes[i], Math.cos(angle) * radius, Math.sin(angle) * radius + 7);
+  }
+  ctx.restore();
+
+  const vignette = ctx.createRadialGradient(centerX, centerY, Math.min(width, height) * 0.18, centerX, centerY, Math.max(width, height) * 0.72);
+  vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  vignette.addColorStop(1, 'rgba(0, 0, 0, 0.62)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, width, height);
 }
 
 function drawMap(ctx: CanvasRenderingContext2D, game: GameState, camera: Vec) {
@@ -511,7 +573,15 @@ type SaveSession = {
   initialSaveData: GameSaveData;
 };
 
-function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; onSignOut: () => void }) {
+function GameApp({
+  saveSession,
+  onSignOut,
+  onOpenSecurity,
+}: {
+  saveSession: SaveSession | null;
+  onSignOut: () => void;
+  onOpenSecurity: () => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const selectedCharacterId = saveSession?.initialSaveData.profile.selectedCharacter || characters[0].id;
   const initialCharacter = characters.find((character) => character.id === selectedCharacterId) || characters[0];
@@ -523,7 +593,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   const savedGameOverRef = useRef(false);
   const [snapshot, setSnapshot] = useState(gameRef.current);
   const [saveData, setSaveData] = useState<GameSaveData>(saveSession?.initialSaveData || createDefaultSaveData());
-  const [saveMessage, setSaveMessage] = useState(saveSession ? 'Cloud save ready' : 'Local test mode');
+  const [saveMessage, setSaveMessage] = useState(saveSession ? 'Cloud save ready' : '');
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterDefinition>(initialCharacter);
   const [selectedWeapon, setSelectedWeapon] = useState<WeaponDefinition>(initialWeapon);
   const [titleEntered, setTitleEntered] = useState(false);
@@ -554,7 +624,7 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
   const start = () => {
     unlockAudio();
     playSound('button');
-    if (gameRef.current.status === 'lounge') {
+    if (gameRef.current.status === 'lounge' || gameRef.current.status === 'stageClear') {
       syncSnapshot();
       return;
     }
@@ -589,14 +659,9 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
 
   const enterTitle = () => {
     unlockAudio();
-    startTitleMusic();
     playSound('button');
+    requestFullScreen();
     setTitleEntered(true);
-  };
-
-  const wakeTitleMusic = () => {
-    unlockAudio();
-    startTitleMusic();
   };
 
   useEffect(() => {
@@ -782,9 +847,9 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
     }
   };
 
-  const characterSlots: Array<CharacterDefinition | null> = [null, null, characters[0], null, null];
-  const centeredCharacter = characterSlots[characterCarouselIndex];
+  const characterGridSlots: Array<CharacterDefinition | null> = [characters[0], null, null, null, null, null];
   const weaponSlots: Array<WeaponDefinition | null> = [null, null, weapons[0], null, null];
+  const weaponGridSlots: Array<WeaponDefinition | null> = [weapons[0], null, null, null, null, null];
   const centeredWeapon = weaponSlots[weaponCarouselIndex];
 
   const chooseWeapon = (weapon: WeaponDefinition) => {
@@ -828,6 +893,11 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
       knobY,
     }));
   };
+
+  const remainingStageTime = Math.max(0, snapshot.stageDuration - snapshot.stageTime);
+  const isTimerWarning = snapshot.status === 'running' && remainingStageTime <= 5;
+  const currentHp = Math.max(0, Math.ceil(snapshot.player.hp));
+  const maxHp = Math.ceil(snapshot.player.maxHp);
 
   return (
     <main className="shell">
@@ -876,77 +946,47 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
           </div>
         )}
 
-        <div className="hud top">
-          <div>
-            <strong>{formatTime(Math.max(0, snapshot.stageDuration - snapshot.stageTime))}</strong>
-            <span>남은 시간</span>
-          </div>
-          <div>
-            <strong>Stage {snapshot.stage}</strong>
-            <span>스테이지</span>
-          </div>
-          <div>
-            <strong>{snapshot.enemies.length}</strong>
-            <span>적</span>
-          </div>
-          <div>
-            <strong>{snapshot.player.gemsCollected}</strong>
-            <span>보석</span>
-          </div>
-          <div>
-            <strong>{snapshot.player.upgradeCurrency}</strong>
-            <span>재화</span>
-          </div>
-        </div>
+        {snapshot.status !== 'lounge' && (
+          <>
+            <div className="hud top">
+              <div className="health-readout">
+                <strong>{currentHp} / {maxHp}</strong>
+              </div>
+              <div>
+                <strong>Stage {snapshot.stage}</strong>
+              </div>
+              <div className="gem-readout">
+                <img src="assets/images/items/gems/xp-gem-small.png" alt="" />
+                <strong>{snapshot.player.gemsCollected}</strong>
+              </div>
+              <div>
+                <strong className={isTimerWarning ? 'timer-warning' : undefined}>{formatTime(remainingStageTime)}</strong>
+              </div>
+            </div>
+          </>
+        )}
 
-        <div className="save-status">
-          <strong>{saveMessage}</strong>
-          <span>Runs {saveData.stats.totalRuns} · Best {formatTime(saveData.stats.bestTime)} · Best Lv {saveData.stats.bestLevel}</span>
-        </div>
-
-        <div className="bars hud-bars">
-          <div className="bar hp">
-            <span style={{ width: `${(snapshot.player.hp / snapshot.player.maxHp) * 100}%` }} />
-          </div>
-          <div className="bar xp">
-            <span style={{ width: `${(snapshot.player.xp / snapshot.player.nextXp) * 100}%` }} />
-          </div>
-        </div>
-
-        <div className="controls">
-          {saveSession && (
+        {snapshot.status !== 'lounge' && (
+          <div className="controls">
+            <button
+              onClick={snapshot.status === 'running' ? togglePause : start}
+              disabled={snapshot.status === 'lounge' || snapshot.status === 'stageClear'}
+              aria-label={snapshot.status === 'running' ? '일시정지' : '시작'}
+            >
+              {snapshot.status === 'running' ? <Pause size={20} /> : <Play size={20} />}
+            </button>
             <button
               onClick={() => {
                 unlockAudio();
                 playSound('button');
-                onSignOut();
+                requestFullScreen();
               }}
-              aria-label="로그아웃"
+              aria-label="전체화면"
             >
-              <LogOut size={20} />
+              <Maximize size={20} />
             </button>
-          )}
-          <button
-            onClick={snapshot.status === 'running' ? togglePause : start}
-            disabled={snapshot.status === 'lounge'}
-            aria-label={snapshot.status === 'running' ? '일시정지' : '시작'}
-          >
-            {snapshot.status === 'running' ? <Pause size={20} /> : <Play size={20} />}
-          </button>
-          <button
-            onClick={() => {
-              unlockAudio();
-              playSound('button');
-              requestFullScreen();
-            }}
-            aria-label="전체화면"
-          >
-            <Maximize size={20} />
-          </button>
-          <button onClick={reset} aria-label="다시 시작">
-            <RotateCcw size={20} />
-          </button>
-        </div>
+          </div>
+        )}
 
         {(snapshot.status === 'levelup' || snapshot.status === 'lounge') && (
           <div className={`upgrade-layer ${snapshot.status === 'lounge' ? 'lounge-layer' : ''}`}>
@@ -955,8 +995,11 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
                 <div className="lounge-header">
                   <span>Stage {snapshot.stage} Clear</span>
                   <strong>대기실</strong>
-                  <p>수집한 보석으로 능력을 구매하고 다음 스테이지로 이동합니다.</p>
-                  <em>보유 보석 {snapshot.player.upgradeCurrency} · 초기화 {snapshot.rerollCost}</em>
+                  <p>수집한 수정으로 능력을 구매하고 다음 스테이지로 이동합니다.</p>
+                  <em>
+                    보유 <img src="assets/images/items/gems/xp-gem-small.png" alt="" /> {snapshot.player.upgradeCurrency}
+                    <span>초기화 <img src="assets/images/items/gems/xp-gem-small.png" alt="" /> {snapshot.rerollCost}</span>
+                  </em>
                 </div>
               )}
               <div className="upgrade-list">
@@ -969,7 +1012,12 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
                   >
                     <strong>{upgrade.title}</strong>
                     <span>{upgrade.body}</span>
-                    {snapshot.status === 'lounge' && <small>{upgrade.cost} 보석</small>}
+                    {snapshot.status === 'lounge' && (
+                      <small>
+                        <img src="assets/images/items/gems/xp-gem-small.png" alt="" />
+                        {upgrade.cost}
+                      </small>
+                    )}
                   </button>
                 ))}
                 {snapshot.status === 'lounge' && snapshot.upgrades.length === 0 && (
@@ -987,7 +1035,11 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
                     disabled={snapshot.player.upgradeCurrency < snapshot.rerollCost}
                     onClick={rerollLoungeUpgrades}
                   >
-                    선택지 초기화 · {snapshot.rerollCost} 보석
+                    <span>선택지 초기화</span>
+                    <small>
+                      <img src="assets/images/items/gems/xp-gem-small.png" alt="" />
+                      {snapshot.rerollCost}
+                    </small>
                   </button>
                   <button className="lounge-skip-button" type="button" onClick={skipLoungeUpgrade}>
                     다음 스테이지
@@ -999,73 +1051,54 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
         )}
 
         {!titleEntered && (
-          <div className="title-layer" onPointerDown={wakeTitleMusic}>
+          <div className="title-layer">
             <button className="title-start-button" type="button" onClick={enterTitle}>
               시작
             </button>
-            {!isAudioUnlocked() && <span className="title-audio-hint">화면을 터치하면 음악이 시작됩니다</span>}
+            <button className="security-toggle title-security-toggle" type="button" onClick={onOpenSecurity}>
+              보안
+            </button>
           </div>
         )}
 
         {titleEntered && !characterSelected && (
           <div className="character-layer">
-            <div className="character-panel character-panel-empty">
-              <div
-                className="character-frame-stage"
-                style={{ '--drag-offset': `${characterDragOffset}px` } as React.CSSProperties}
-                onPointerDown={startCharacterFrameDrag}
-                onPointerMove={moveCharacterFrameDrag}
-                onPointerUp={endCharacterFrameDrag}
-                onPointerCancel={endCharacterFrameDrag}
-                onDragStart={(event) => event.preventDefault()}
-              >
-                {characterSlots.map((character, slotIndex) => {
-                  const relative = slotIndex - characterCarouselIndex;
-                  if (Math.abs(relative) > 2) return null;
-                  const positionClass =
-                    relative === -2
-                      ? 'character-slot-left-far'
-                      : relative === -1
-                        ? 'character-slot-left-near'
-                        : relative === 0
-                          ? 'character-slot-main'
-                          : relative === 1
-                            ? 'character-slot-right-near'
-                            : 'character-slot-right-far';
-                  const isMain = relative === 0;
+            <div className="character-panel character-grid-panel">
+              <div className="character-grid-title">
+                <span>영웅 선택</span>
+                <strong>아르테라의 수호자</strong>
+              </div>
+              <div className="character-grid">
+                {characterGridSlots.map((character, slotIndex) => {
                   return (
-                    <div key={slotIndex} className={`character-carousel-card ${positionClass}`}>
+                    <button
+                      key={character?.id || `locked-${slotIndex}`}
+                      className={`character-grid-card ${character ? 'character-grid-card-ready' : 'character-grid-card-locked'}`}
+                      type="button"
+                      disabled={!character}
+                      onClick={() => character && chooseCharacter(character)}
+                    >
                       {character && (
-                        <span className={isMain ? 'character-preview-art' : 'character-side-art'}>
+                        <span className="character-grid-portrait">
                           <img src="assets/images/characters/caiden-portrait.png" alt="" draggable={false} />
                         </span>
                       )}
-                      <img
-                        className={isMain ? 'character-preview-frame' : 'character-side-frame'}
-                        src={isMain ? 'assets/images/ui/character-weapon-select/card-frame-main.png' : 'assets/images/ui/character-weapon-select/card-frame-small.png'}
-                        alt=""
-                        draggable={false}
-                      />
-                      {!isMain && character && <span className="character-side-name">{characterName(character)}</span>}
-                      {isMain && character && (
+                      {character ? (
                         <>
-                          <span className="character-preview-name">{characterName(character)}</span>
-                          <span className="character-preview-description">{characterDescription(character)}</span>
+                          <strong>{characterName(character)}</strong>
+                          <span>{characterDescription(character)}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="character-grid-seal">봉인</span>
+                          <strong>봉인됨</strong>
+                          <span>아직 깨어나지 않은 영웅입니다.</span>
                         </>
                       )}
-                      {!character && <span className={isMain ? 'character-main-locked' : 'character-side-locked'}>봉인됨</span>}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
-              <button
-                className="character-select-button"
-                type="button"
-                disabled={!centeredCharacter}
-                onClick={() => centeredCharacter && chooseCharacter(centeredCharacter)}
-              >
-                {centeredCharacter ? '선택' : '봉인됨'}
-              </button>
             </div>
           </div>
         )}
@@ -1084,63 +1117,42 @@ function GameApp({ saveSession, onSignOut }: { saveSession: SaveSession | null; 
               />
               <span className="selected-character-summary-name">{characterName(selectedCharacter)}</span>
             </div>
-            <div className="character-panel character-panel-empty weapon-select-panel">
-              <div
-                className="character-frame-stage"
-                style={{ '--drag-offset': `${weaponDragOffset}px` } as React.CSSProperties}
-                onPointerDown={startWeaponFrameDrag}
-                onPointerMove={moveWeaponFrameDrag}
-                onPointerUp={endWeaponFrameDrag}
-                onPointerCancel={endWeaponFrameDrag}
-                onDragStart={(event) => event.preventDefault()}
-              >
-                {weaponSlots.map((weapon, slotIndex) => {
-                  const relative = slotIndex - weaponCarouselIndex;
-                  if (Math.abs(relative) > 2) return null;
-                  const positionClass =
-                    relative === -2
-                      ? 'character-slot-left-far'
-                      : relative === -1
-                        ? 'character-slot-left-near'
-                        : relative === 0
-                          ? 'character-slot-main'
-                          : relative === 1
-                            ? 'character-slot-right-near'
-                            : 'character-slot-right-far';
-                  const isMain = relative === 0;
+            <div className="character-panel character-grid-panel weapon-grid-panel">
+              <div className="character-grid-title weapon-grid-title">
+                <span>무기 선택</span>
+                <strong>전투 방식 선택</strong>
+              </div>
+              <div className="character-grid weapon-grid">
+                {weaponGridSlots.map((weapon, slotIndex) => {
                   return (
-                    <div key={slotIndex} className={`character-carousel-card weapon-carousel-card ${positionClass}`}>
+                    <button
+                      key={weapon?.id || `locked-weapon-${slotIndex}`}
+                      className={`character-grid-card weapon-grid-card ${weapon ? 'character-grid-card-ready' : 'character-grid-card-locked'}`}
+                      type="button"
+                      disabled={!weapon}
+                      onClick={() => weapon && chooseWeapon(weapon)}
+                    >
                       {weapon && (
-                        <span className={isMain ? 'weapon-preview-art' : 'weapon-side-art'}>
+                        <span className="weapon-grid-portrait">
                           <img src="assets/images/weapons/magic-staff.png" alt="" draggable={false} />
                         </span>
                       )}
-                      <img
-                        className={isMain ? 'character-preview-frame' : 'character-side-frame'}
-                        src={isMain ? 'assets/images/ui/character-weapon-select/card-frame-main.png' : 'assets/images/ui/character-weapon-select/card-frame-small.png'}
-                        alt=""
-                        draggable={false}
-                      />
-                      {!isMain && weapon && <span className="character-side-name">{weaponName(weapon)}</span>}
-                      {isMain && weapon && (
+                      {weapon ? (
                         <>
-                          <span className="character-preview-name">{weaponName(weapon)}</span>
-                          <span className="character-preview-description">{weaponDescription(weapon)}</span>
+                          <strong>{weaponName(weapon)}</strong>
+                          <span>{weaponDescription(weapon)}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="character-grid-seal">봉인</span>
+                          <strong>봉인됨</strong>
+                          <span>아직 발견하지 못한 무기입니다.</span>
                         </>
                       )}
-                      {!weapon && <span className={isMain ? 'character-main-locked' : 'character-side-locked'}>봉인됨</span>}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
-              <button
-                className="character-select-button"
-                type="button"
-                disabled={!centeredWeapon}
-                onClick={() => centeredWeapon && chooseWeapon(centeredWeapon)}
-              >
-                {centeredWeapon ? '선택' : '봉인됨'}
-              </button>
             </div>
           </div>
         )}
@@ -1381,19 +1393,14 @@ function AuthGate() {
   if (settingsOpen) {
     return (
       <>
-        <GameApp saveSession={saveSession} onSignOut={signOut} />
+        <GameApp saveSession={saveSession} onSignOut={signOut} onOpenSecurity={() => setSettingsOpen(true)} />
         <div className="security-drawer">{settingsForm(client ? 'Save and enter' : 'Save connection', !client && !devBypass)}</div>
       </>
     );
   }
 
   return (
-    <>
-      <GameApp saveSession={saveSession} onSignOut={signOut} />
-      <button className="security-toggle" type="button" onClick={() => setSettingsOpen(true)}>
-        보안
-      </button>
-    </>
+    <GameApp saveSession={saveSession} onSignOut={signOut} onOpenSecurity={() => setSettingsOpen(true)} />
   );
 }
 

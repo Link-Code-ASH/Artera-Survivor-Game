@@ -14,8 +14,8 @@ These values are the current run-starting player stats created by `newGame()` in
 | Damage taken multiplier | Character value | `caiden` currently uses `1`. Lower values mean less incoming damage. |
 | Facing direction | `right` | Initial facing direction. |
 | XP | `0` | Starting XP. |
-| Next level XP | `18` | XP required for level 2. |
-| Level | `1` | Starting level. |
+| Next level XP | `18` | Stored for future systems; XP leveling is currently disabled. |
+| Level | `1` | Starting level; currently does not increase from XP. |
 | Magnet range | `82` | Range where gems start moving toward the player. |
 | Fire rate | Weapon value | `magic-staff` currently uses `0.62` seconds. Lower values attack faster. |
 | Projectile speed | Weapon value | `magic-staff` currently uses `530`. |
@@ -57,6 +57,7 @@ Keep first-pass values easy to tune. Exact numbers can be adjusted after testing
 | Starting stage | `1` | New runs begin at stage 1. |
 | Stage duration | `30` seconds | First-pass value for the Brotato-style stage structure. |
 | Stage timer | `0` | Resets when the next stage starts. |
+| Stage clear pause | `1.2` seconds | Short delay before the waiting room appears. |
 | Map width | `2200` | First-pass bounded stage arena width. |
 | Map height | `1600` | First-pass bounded stage arena height. |
 | Stage transition HP | Full restore | HP is restored to max HP when starting the next stage. |
@@ -70,7 +71,7 @@ Stage difficulty currently scales from stage number and time inside the current 
 | Slime gem drop count | `1` | Each defeated slime drops one XP gem object. |
 | XP per gem | `4` | A collected gem grants XP. |
 | Currency per gem | `1` | A collected gem also adds one upgrade currency. |
-| Upgrade cost | `3` gems | First-pass shared cost for waiting-room upgrade purchases. |
+| Upgrade tier costs | `3`, `5`, `7`, `9`, `11` gems | Costs for tiers I through V. |
 | First reroll cost | `1` gem | Rerolls the current waiting-room upgrade choices. |
 | Reroll cost increase | `+1` gem | Each reroll during the same waiting-room visit increases the next reroll cost by 1. |
 
@@ -108,6 +109,13 @@ Use this section as the baseline when the user asks to raise, lower, speed up, s
 | Projectile hit radius | `5` | `src/game/systems.ts` | Hit check uses enemy radius plus this value. |
 | Projectile pierce | `0` | `src/game/state.ts` | Extra pierce before upgrades. |
 | Projectile knockback | `18` | `src/game/state.ts` | Base push strength before upgrades. |
+| Projectile lifetime | `1.15` seconds | `src/game/state.ts` | Base lifetime before range upgrades. |
+| Projectile homing | `0` | `src/game/state.ts` | No steering before upgrades. |
+| Splash damage | `0` | `src/game/state.ts` | No on-kill splash before upgrades. |
+| Slow chance | `0` | `src/game/state.ts` | No slow on hit before upgrades. |
+| Reflection damage | `0` | `src/game/state.ts` | No contact reflection before upgrades. |
+| Damage over time | `0` | `src/game/state.ts` | No DOT before upgrades. |
+| Double gem chance | `0` | `src/game/state.ts` | Gem pickups count normally before upgrades. |
 | Multi-projectile spread | `0.22` radians | `src/game/systems.ts` | Used when projectile count is above 1. |
 
 ### Enemy: Slime
@@ -166,31 +174,43 @@ Use this section as the baseline when the user asks to raise, lower, speed up, s
 | Gem pull minimum speed | `120` | `src/game/systems.ts` | Magnet pull speed lower clamp. |
 | Gem pull maximum speed | `520` | `src/game/systems.ts` | Magnet pull speed upper clamp. |
 | Gem pull formula | `360 - distance` | `src/game/systems.ts` | Clamped between `120` and `520`. |
-| XP required for level 2 | `18` | `src/game/state.ts` | XP still exists as a progression resource. |
-| XP requirement scaling | `nextXp * 1.28 + 7` | `src/game/systems.ts` | Rounded down with `Math.floor`. |
+| XP required for level 2 | `18` | `src/game/state.ts` | Stored for future systems only. |
+| XP requirement scaling | Disabled | `src/game/systems.ts` | XP no longer increases level, plays level-up sound, shows level-up text, or changes stats. |
 
 ### Waiting Room Economy
 
 | Value | Current Value | Code Location | Notes |
 | --- | ---: | --- | --- |
 | Upgrade choices shown | `3` | `src/game/systems.ts` | Current offer count after stage clear or reroll. |
-| Shared upgrade cost | `3` gems | `src/content/upgrades.ts` | All upgrades currently cost the same. |
+| Upgrade family count | `18` | `src/content/upgrades.ts` | Each family has five tiers. |
+| Upgrade tiers per family | `5` | `src/content/upgrades.ts` | Tiers are displayed as Roman numerals I through V. |
+| Upgrade tier costs | `3`, `5`, `7`, `9`, `11` gems | `src/content/upgrades.ts` | Costs increase by tier. |
+| Upgrade offer rule | Next tier only | `src/content/upgrades.ts` | Maxed families stop appearing. |
 | First reroll cost | `1` gem | `src/game/state.ts` | Resets each waiting-room visit. |
 | Reroll cost increase | `+1` | `src/game/systems.ts` | Added after each successful reroll. |
 | Stage transition healing | Full HP | `src/game/systems.ts` | Starting next stage sets HP to max HP. |
 
 ### Current Upgrade Effects
 
-| Upgrade ID | Current Effect | Cost | Notes |
-| --- | --- | ---: | --- |
-| `rapid` | Fire rate `* 0.84`, minimum `0.18` | `3` | Lower fire rate means faster attacks. |
-| `damage` | Damage `+7` | `3` | Adds flat projectile damage. |
-| `projectile` | Projectile count `+1` | `3` | Adds one projectile per attack. |
-| `speed` | Movement speed `+18` | `3` | Adds flat movement speed. |
-| `magnet` | Magnet range `+34` | `3` | Pulls gems from farther away. |
-| `heart` | Max HP `+22` | `3` | Does not heal current HP immediately. |
-| `pierce` | Pierce `+1` | `3` | Lets projectiles hit more enemies. |
-| `velocity` | Projectile speed `+95`, damage `+3` | `3` | Mixed projectile upgrade. |
-| `barrier` | Damage taken multiplier `* 0.86`, minimum `0.45` | `3` | Lower incoming damage. |
-| `knockback` | Knockback `+20` | `3` | Pushes enemies harder. |
-| `overload` | Damage `+5`, fire rate `* 0.9`, minimum `0.18` | `3` | Mixed damage and attack speed upgrade. |
+All upgrade families have five tiers. Cost by tier is `I = 3`, `II = 5`, `III = 7`, `IV = 9`, and `V = 11`.
+
+| Upgrade ID | Name | Per-Tier Effect | Notes |
+| --- | --- | --- | --- |
+| `rapid` | `비전 속삭임` | Fire rate `* 0.94`, minimum `0.18`. | Lower fire rate means faster attacks. |
+| `damage` | `룬 각인` | Damage `+5 + tier * 2`. | Adds flat projectile damage. |
+| `projectile` | `쌍월 주문` | Projectile count `+1`. | Adds one projectile per attack. |
+| `speed` | `질풍 망토` | Movement speed `+12 + tier * 3`. | Adds flat movement speed. |
+| `magnet` | `수정 부름` | Magnet range `+24 + tier * 6`. | Pulls gems from farther away. |
+| `heart` | `성소의 축복` | Max HP `+16 + tier * 4`. | Does not heal current HP immediately. |
+| `pierce` | `관통의 룬` | Pierce `+1`. | Lets projectiles hit more enemies. |
+| `velocity` | `빠른 혜성` | Projectile speed `+70 + tier * 15`, damage `+tier + 1`. | Mixed projectile upgrade. |
+| `barrier` | `수호 결계` | Damage taken multiplier `* 0.92`, minimum `0.45`. | Lower incoming damage. |
+| `knockback` | `충격 파동` | Knockback `+14 + tier * 3`. | Pushes enemies harder. |
+| `overload` | `마력 과부하` | Damage `+3 + tier * 2`, fire rate `* 0.96`, minimum `0.18`. | Mixed damage and attack speed upgrade. |
+| `range` | `별빛 사거리` | Projectile lifetime `+0.12 + tier * 0.03` seconds. | Increases effective range. |
+| `splash` | `파열의 낙인` | Splash damage `+10 + tier * 5`, radius at least `76 + tier * 8`. | Triggers when an enemy is defeated. |
+| `slow` | `서리 족쇄` | Slow chance `+0.18 + tier * 0.02`, up to `0.75`; duration at least `1 + tier * 0.15` seconds. | Slows enemies on hit. |
+| `thorns` | `거울 갑주` | Reflection damage `+10 + tier * 4` per second while touching enemies. | Damages enemies during contact. |
+| `dot` | `잔불 저주` | DOT damage `+3 + tier * 2` per second; duration at least `2 + tier * 0.2` seconds. | Applies on projectile hit. |
+| `homing` | `추적의 별` | Homing strength `+0.18 + tier * 0.04`, up to `0.9`. | Projectiles steer toward enemies. |
+| `double-gem` | `탐욕의 별잔` | Double gem chance `+0.08 + tier * 0.04`, up to `0.75`. | Picked-up gems can count as two. |

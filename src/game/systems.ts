@@ -1,21 +1,28 @@
-import { upgrades } from '../content';
+import { buildAvailableUpgrades } from '../content';
 import { playSound } from '../soundSystem';
 import { getCamera, getWorldView } from './camera';
 import { clamp, norm } from './math';
 import type { EnemyKind, GameState, Upgrade, Vec } from './types';
 
 export function pickUpgrades(game: GameState) {
-  game.upgrades = [...upgrades].sort(() => Math.random() - 0.5).slice(0, 3);
+  game.upgrades = buildAvailableUpgrades(game).sort(() => Math.random() - 0.5).slice(0, 3);
 }
 
 export function completeStage(game: GameState) {
-  game.status = 'lounge';
+  game.status = 'stageClear';
   game.stageTime = game.stageDuration;
-  game.rerollCost = 1;
+  game.stageClearTimer = 1.2;
   game.enemies = [];
   game.bullets = [];
   game.gems = [];
   game.texts.push({ x: game.player.x, y: game.player.y - 30, text: `STAGE ${game.stage} CLEAR`, life: 1.2, color: '#f8dc86' });
+}
+
+function enterLounge(game: GameState) {
+  game.status = 'lounge';
+  game.stageTime = game.stageDuration;
+  game.stageClearTimer = 0;
+  game.rerollCost = 1;
   pickUpgrades(game);
   playSound('levelup');
 }
@@ -23,6 +30,7 @@ export function completeStage(game: GameState) {
 export function startNextStage(game: GameState) {
   game.stage += 1;
   game.stageTime = 0;
+  game.stageClearTimer = 0;
   game.rerollCost = 1;
   game.player.hp = game.player.maxHp;
   game.spawnClock = 0;
@@ -41,8 +49,9 @@ export function applyUpgrade(game: GameState, upgrade: Upgrade) {
     game.player.upgradeCurrency -= upgrade.cost;
   }
   upgrade.apply(game);
+  game.upgradeLevels[upgrade.familyId] = upgrade.tier;
   if (game.status === 'lounge') {
-    game.upgrades = game.upgrades.filter((candidate) => candidate.id !== upgrade.id);
+    game.upgrades = game.upgrades.filter((candidate) => candidate.familyId !== upgrade.familyId);
   } else {
     game.upgrades = [];
     game.status = 'running';
@@ -102,6 +111,10 @@ function spawnEnemy(game: GameState) {
     damage: isGoblin ? slimeDamage * 1.5 : slimeDamage,
     gemDrops: isGoblin ? 2 : 1,
     kind,
+    slowTimer: 0,
+    slowMultiplier: 1,
+    dotTimer: 0,
+    dotDamage: 0,
   });
 }
 
@@ -133,28 +146,67 @@ function shoot(game: GameState) {
       y: game.player.y,
       vx: Math.cos(angle) * game.player.bulletSpeed,
       vy: Math.sin(angle) * game.player.bulletSpeed,
-      life: 1.15,
+      life: game.player.bulletLife,
       damage: game.player.damage,
       pierce: game.player.pierce,
       knockback: game.player.knockback,
+      homing: game.player.homing,
       hitIds: [],
     });
   }
 }
 
-function gainXp(game: GameState, amount: number) {
-  game.player.xp += amount;
-  while (game.player.xp >= game.player.nextXp) {
-    game.player.xp -= game.player.nextXp;
-    game.player.level += 1;
-    game.player.nextXp = Math.floor(game.player.nextXp * 1.28 + 7);
-    game.texts.push({ x: game.player.x, y: game.player.y - 30, text: 'LEVEL UP', life: 1, color: '#f8dc86' });
-    playSound('levelup');
-    break;
+function dropEnemyRewards(game: GameState, enemy: { x: number; y: number; id: number; gemDrops: number }) {
+  for (let i = 0; i < enemy.gemDrops; i += 1) {
+    const angle = (Math.PI * 2 * i) / enemy.gemDrops + enemy.id * 0.73;
+    const distance = enemy.gemDrops === 1 ? 0 : 12;
+    game.gems.push({
+      x: enemy.x + Math.cos(angle) * distance,
+      y: enemy.y + Math.sin(angle) * distance,
+      value: 4,
+      r: 5,
+    });
+  }
+  game.texts.push({ x: enemy.x, y: enemy.y, text: `+${enemy.gemDrops}`, life: 0.7, color: '#9ee8ff' });
+}
+
+function triggerSplash(game: GameState, source: { x: number; y: number; id: number }) {
+  if (game.player.splashDamage <= 0 || game.player.splashRadius <= 0) return;
+  for (const enemy of game.enemies) {
+    if (enemy.id === source.id || enemy.hp <= 0) continue;
+    if (Math.hypot(enemy.x - source.x, enemy.y - source.y) <= game.player.splashRadius) {
+      enemy.hp -= game.player.splashDamage;
+      game.texts.push({ x: enemy.x, y: enemy.y - 10, text: `${Math.round(game.player.splashDamage)}`, life: 0.45, color: '#ffca7a' });
+      if (enemy.hp <= 0) {
+        dropEnemyRewards(game, enemy);
+      }
+    }
   }
 }
 
+function defeatEnemy(game: GameState, enemy: { x: number; y: number; id: number; gemDrops: number }) {
+  dropEnemyRewards(game, enemy);
+  triggerSplash(game, enemy);
+}
+
+function gainXp(game: GameState, amount: number) {
+  game.player.xp += amount;
+}
+
 export function updateGame(game: GameState, dt: number, inputVector: () => Vec) {
+  if (game.status === 'stageClear') {
+    game.stageClearTimer -= dt;
+    for (const text of game.texts) {
+      text.y -= 28 * dt;
+      text.life -= dt;
+    }
+    game.texts = game.texts.filter((t) => t.life > 0);
+    if (game.stageClearTimer <= 0) {
+      enterLounge(game);
+    }
+    return;
+  }
+
   if (game.status !== 'running') return;
   game.time += dt;
   game.stageTime += dt;
@@ -194,19 +246,52 @@ export function updateGame(game: GameState, dt: number, inputVector: () => Vec) 
 
   for (const enemy of game.enemies) {
     const toPlayer = norm({ x: game.player.x - enemy.x, y: game.player.y - enemy.y });
-    enemy.x += toPlayer.x * enemy.speed * dt;
-    enemy.y += toPlayer.y * enemy.speed * dt;
+    enemy.slowTimer = Math.max(0, enemy.slowTimer - dt);
+    const enemySpeed = enemy.speed * (enemy.slowTimer > 0 ? enemy.slowMultiplier : 1);
+    enemy.x += toPlayer.x * enemySpeed * dt;
+    enemy.y += toPlayer.y * enemySpeed * dt;
     if (Math.hypot(enemy.x - game.player.x, enemy.y - game.player.y) < enemy.r + game.player.r) {
       game.player.hp -= enemy.damage * dt * game.player.damageTakenMultiplier;
+      if (game.player.thornsDamage > 0) {
+        enemy.hp -= game.player.thornsDamage * dt;
+        if (enemy.hp <= 0) {
+          defeatEnemy(game, enemy);
+        }
+      }
       enemy.x -= toPlayer.x * 18 * dt;
       enemy.y -= toPlayer.y * 18 * dt;
     }
   }
 
   for (const bullet of game.bullets) {
+    if (bullet.homing > 0) {
+      const target = nearestEnemy(game);
+      if (target) {
+        const speed = Math.hypot(bullet.vx, bullet.vy);
+        const desired = norm({ x: target.x - bullet.x, y: target.y - bullet.y });
+        const blend = clamp(bullet.homing * dt * 4, 0, 1);
+        const next = norm({
+          x: bullet.vx / speed + desired.x * blend,
+          y: bullet.vy / speed + desired.y * blend,
+        });
+        bullet.vx = next.x * speed;
+        bullet.vy = next.y * speed;
+      }
+    }
     bullet.x += bullet.vx * dt;
     bullet.y += bullet.vy * dt;
     bullet.life -= dt;
+  }
+
+  for (const enemy of game.enemies) {
+    if (enemy.hp <= 0) continue;
+    if (enemy.dotTimer > 0 && enemy.dotDamage > 0) {
+      enemy.dotTimer -= dt;
+      enemy.hp -= enemy.dotDamage * dt;
+      if (enemy.hp <= 0) {
+        defeatEnemy(game, enemy);
+      }
+    }
   }
 
   for (const bullet of game.bullets) {
@@ -217,6 +302,14 @@ export function updateGame(game: GameState, dt: number, inputVector: () => Vec) 
       if (Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y) < enemy.r + 5) {
         enemy.hp -= bullet.damage;
         bullet.hitIds.push(enemy.id);
+        if (game.player.slowChance > 0 && Math.random() < game.player.slowChance) {
+          enemy.slowTimer = Math.max(enemy.slowTimer, game.player.slowDuration);
+          enemy.slowMultiplier = Math.min(enemy.slowMultiplier, game.player.slowMultiplier);
+        }
+        if (game.player.dotDamage > 0 && game.player.dotDuration > 0) {
+          enemy.dotTimer = Math.max(enemy.dotTimer, game.player.dotDuration);
+          enemy.dotDamage = Math.max(enemy.dotDamage, game.player.dotDamage);
+        }
         const push = norm({ x: bullet.vx, y: bullet.vy });
         enemy.x += push.x * bullet.knockback;
         enemy.y += push.y * bullet.knockback;
@@ -225,17 +318,7 @@ export function updateGame(game: GameState, dt: number, inputVector: () => Vec) 
         }
         playSound('hit');
         if (enemy.hp <= 0) {
-          for (let i = 0; i < enemy.gemDrops; i += 1) {
-            const angle = (Math.PI * 2 * i) / enemy.gemDrops + enemy.id * 0.73;
-            const distance = enemy.gemDrops === 1 ? 0 : 12;
-            game.gems.push({
-              x: enemy.x + Math.cos(angle) * distance,
-              y: enemy.y + Math.sin(angle) * distance,
-              value: 4,
-              r: 5,
-            });
-          }
-          game.texts.push({ x: enemy.x, y: enemy.y, text: `+${enemy.gemDrops}`, life: 0.7, color: '#9ee8ff' });
+          defeatEnemy(game, enemy);
         }
         break;
       }
@@ -253,9 +336,10 @@ export function updateGame(game: GameState, dt: number, inputVector: () => Vec) 
     if (d < game.player.r + gem.r) {
       gem.value = -gem.value;
       playSound('pickup');
-      game.player.gemsCollected += 1;
-      game.player.upgradeCurrency += 1;
-      gainXp(game, Math.abs(gem.value));
+      const gain = Math.random() < game.player.doubleGemChance ? 2 : 1;
+      game.player.gemsCollected += gain;
+      game.player.upgradeCurrency += gain;
+      gainXp(game, Math.abs(gem.value) * gain);
     }
   }
 

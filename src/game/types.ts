@@ -12,6 +12,10 @@ export type Enemy = {
   damage: number;
   gemDrops: number;
   kind: EnemyKind;
+  slowTimer: number;
+  slowMultiplier: number;
+  dotTimer: number;
+  dotDamage: number;
 };
 
 export type Bullet = {
@@ -23,6 +27,7 @@ export type Bullet = {
   damage: number;
   pierce: number;
   knockback: number;
+  homing: number;
   hitIds: number[];
 };
 
@@ -32,6 +37,8 @@ export type FloatText = { x: number; y: number; text: string; life: number; colo
 
 export type Upgrade = {
   id: string;
+  familyId: string;
+  tier: number;
   title: string;
   body: string;
   cost: number;
@@ -62,13 +69,14 @@ export type WeaponDefinition = {
 export type Direction = 'down' | 'left' | 'right' | 'up';
 
 export type GameState = {
-  status: 'ready' | 'running' | 'paused' | 'levelup' | 'lounge' | 'gameover';
+  status: 'ready' | 'running' | 'paused' | 'levelup' | 'stageClear' | 'lounge' | 'gameover';
   width: number;
   height: number;
   time: number;
   stage: number;
   stageTime: number;
   stageDuration: number;
+  stageClearTimer: number;
   mapWidth: number;
   mapHeight: number;
   rerollCost: number;
@@ -99,10 +107,22 @@ export type GameState = {
     pierce: number;
     regen: number;
     knockback: number;
+    bulletLife: number;
+    splashDamage: number;
+    splashRadius: number;
+    slowChance: number;
+    slowMultiplier: number;
+    slowDuration: number;
+    thornsDamage: number;
+    dotDamage: number;
+    dotDuration: number;
+    homing: number;
+    doubleGemChance: number;
   };
   enemies: Enemy[];
   bullets: Bullet[];
   gems: Gem[];
   texts: FloatText[];
   upgrades: Upgrade[];
+  upgradeLevels: Record<string, number>;
 };
