@@ -228,18 +228,20 @@ input {
 }
 
 .hud.top {
-  top: 12px;
+  top: 6px;
   left: 50%;
   transform: translateX(-50%);
 }
 
 .status-panel {
-  width: min(460px, calc(100vw - 20px));
-  min-height: 62px;
+  display: grid;
+  grid-template-columns: minmax(58px, 0.9fr) minmax(106px, 1.65fr) minmax(42px, 0.72fr) minmax(24px, 0.42fr);
+  width: min(430px, calc(100vw - 8px));
+  min-height: 44px;
   align-items: center;
-  justify-content: space-between;
-  gap: clamp(3px, 1.4vw, 10px);
-  padding: 0 clamp(14px, 4vw, 24px);
+  justify-content: center;
+  gap: clamp(1px, 0.8vw, 6px);
+  padding: 0 clamp(7px, 2.4vw, 16px);
   background: url("../assets/images/ui/in-game/status-frame-very-wide.png") center / 100% 100% no-repeat;
   color: #ffe8ad;
   filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.34));
@@ -247,14 +249,14 @@ input {
 
 .hud div {
   display: flex;
-  height: 62px;
+  height: 44px;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 0;
   border: 0;
   background: none;
-  transform: translateY(3px);
+  transform: translateY(2px);
 }
 
 .hud strong,
@@ -264,7 +266,7 @@ input {
 
 .hud strong {
   color: #fff2bf;
-  font-size: clamp(14px, 3.45vw, 20px);
+  font-size: clamp(13px, 3.35vw, 19px);
   font-variant-numeric: tabular-nums;
   font-style: italic;
   font-weight: 950;
@@ -278,11 +280,11 @@ input {
 .stage-timer {
   position: absolute;
   z-index: 3;
-  top: 72px;
+  top: 54px;
   left: 50%;
   transform: translateX(-50%);
   color: #fff6df;
-  font-size: clamp(40px, 11.7vw, 67px);
+  font-size: clamp(36px, 10.6vw, 62px);
   font-weight: 900;
   line-height: 0.9;
   letter-spacing: 0;
@@ -323,7 +325,7 @@ input {
 
 .hud span {
   color: #d8ad5f;
-  font-size: clamp(10px, 2.35vw, 12px);
+  font-size: clamp(9px, 2.25vw, 11px);
   font-style: normal;
   font-weight: 900;
   line-height: 1;
@@ -372,7 +374,7 @@ input {
 
 .health-readout {
   display: flex;
-  min-width: clamp(116px, 31vw, 168px);
+  min-width: 0;
   align-items: center;
   justify-content: center;
   border: 0;
@@ -383,15 +385,15 @@ input {
 }
 
 .health-readout strong {
-  min-width: 74px;
-  font-size: clamp(14px, 3.35vw, 19px);
+  min-width: 66px;
+  font-size: clamp(13px, 3.2vw, 18px);
   line-height: 1;
   text-align: center;
   white-space: nowrap;
 }
 
 .stage-readout {
-  min-width: clamp(62px, 16vw, 84px);
+  min-width: 0;
   color: #f8dc86;
 }
 
@@ -399,21 +401,21 @@ input {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: clamp(46px, 12vw, 68px);
-  gap: 6px;
+  min-width: 0;
+  gap: 5px;
 }
 
 .gem-readout img {
-  width: clamp(16px, 3.8vw, 20px);
-  height: clamp(16px, 3.8vw, 20px);
+  width: clamp(15px, 3.6vw, 19px);
+  height: clamp(15px, 3.6vw, 19px);
   object-fit: contain;
   filter: drop-shadow(0 0 5px rgba(155, 226, 255, 0.58));
 }
 
 .hud-control-button {
   display: grid;
-  width: clamp(30px, 8vw, 38px);
-  height: 62px;
+  width: clamp(23px, 6.4vw, 30px);
+  height: 44px;
   flex: 0 0 auto;
   place-items: center;
   border: 0;
@@ -423,7 +425,7 @@ input {
   cursor: pointer;
   pointer-events: auto;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.44));
-  transform: translateY(3px);
+  transform: translateY(2px);
 }
 
 .hud-control-button:hover {
@@ -2519,25 +2521,52 @@ input {
   }
 
   .hud.top {
-    flex-wrap: wrap;
-    max-width: calc(100% - 72px);
+    flex-wrap: nowrap;
+    width: calc(100vw - 8px);
+    max-width: 430px;
+  }
+
+  .status-panel {
+    grid-template-columns: minmax(54px, 0.9fr) minmax(102px, 1.72fr) minmax(38px, 0.68fr) minmax(22px, 0.36fr);
+    min-height: 42px;
+    padding-inline: 7px;
   }
 
   .hud div {
-    min-width: 62px;
-    padding: 7px 8px;
+    height: 42px;
+    min-width: 0;
+    padding: 0;
   }
 
   .hud strong {
-    font-size: 14px;
+    font-size: clamp(12px, 3.35vw, 15px);
   }
 
   .health-readout {
-    width: clamp(132px, 38vw, 168px);
+    min-width: 0;
   }
 
   .health-readout strong {
-    font-size: clamp(11px, 3.2vw, 14px);
+    min-width: 62px;
+    font-size: clamp(12px, 3.2vw, 15px);
+  }
+
+  .stage-readout {
+    min-width: 0;
+  }
+
+  .gem-readout {
+    min-width: 0;
+  }
+
+  .hud-control-button {
+    width: clamp(22px, 6.4vw, 28px);
+    height: 42px;
+  }
+
+  .stage-timer {
+    top: 52px;
+    font-size: clamp(34px, 10.2vw, 46px);
   }
 
   .upgrade-list {
