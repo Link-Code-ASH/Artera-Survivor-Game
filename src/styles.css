@@ -228,7 +228,7 @@ input {
 }
 
 .hud.top {
-  top: max(18px, env(safe-area-inset-top));
+  top: max(34px, calc(env(safe-area-inset-top) + 14px));
   left: 50%;
   transform: translateX(-50%);
 }
@@ -280,7 +280,7 @@ input {
 .stage-timer {
   position: absolute;
   z-index: 3;
-  top: calc(max(18px, env(safe-area-inset-top)) + 48px);
+  top: calc(max(34px, calc(env(safe-area-inset-top) + 14px)) + 48px);
   left: 50%;
   transform: translateX(-50%);
   color: #fff6df;
@@ -2565,7 +2565,7 @@ input {
   }
 
   .stage-timer {
-    top: calc(max(18px, env(safe-area-inset-top)) + 46px);
+    top: calc(max(34px, calc(env(safe-area-inset-top) + 14px)) + 46px);
     font-size: clamp(34px, 10.2vw, 46px);
   }
 
