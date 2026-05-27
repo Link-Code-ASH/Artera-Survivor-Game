@@ -55,7 +55,7 @@ Keep first-pass values easy to tune. Exact numbers can be adjusted after testing
 | Value | Current Value | Notes |
 | --- | ---: | --- |
 | Starting stage | `1` | New runs begin at stage 1. |
-| Stage duration | `15` seconds | First-pass value for the Brotato-style stage structure. |
+| Stage duration | `60` seconds | Current stage length for the Brotato-style stage structure. |
 | Stage timer | `0` | Resets when the next stage starts. |
 | Stage clear pause | `1.2` seconds | Short delay before the waiting room appears. |
 | Map width | `1360` | Portrait-first bounded stage arena width. |
@@ -75,7 +75,7 @@ Stage difficulty currently scales from stage number and time inside the current 
 | First reroll cost | `1` gem | Rerolls the current waiting-room upgrade choices. |
 | Reroll cost increase | `+1` gem | Each reroll during the same waiting-room visit increases the next reroll cost by 1. |
 
-These are temporary values for testing the 15-second stage loop. The user can tune costs, XP values, drop rates, and reward pacing later.
+These are temporary values for testing the 60-second stage loop. The user can tune costs, XP values, drop rates, and reward pacing later.
 
 ## Current Removed Or Avoided Upgrade Effects
 - Direct current-HP healing is avoided because HP is restored between stages.
@@ -150,7 +150,7 @@ Use this section as the baseline when the user asks to raise, lower, speed up, s
 
 | Value | Current Value | Code Location | Notes |
 | --- | ---: | --- | --- |
-| Stage duration | `15` seconds | `src/game/state.ts` | Current first-pass stage length. |
+| Stage duration | `60` seconds | `src/game/state.ts` | Current stage length. |
 | Map width | `1360` | `src/game/state.ts` | Bounded portrait arena width. |
 | Map height | `1870` | `src/game/state.ts` | Bounded portrait arena height. |
 | Spawn margin | `90` | `src/game/systems.ts` | Spawn attempt is just outside the camera view. |

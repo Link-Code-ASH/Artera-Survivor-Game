@@ -621,6 +621,7 @@ function GameApp({
   const frameRef = useRef(0);
   const lastRef = useRef(0);
   const savedGameOverRef = useRef(false);
+  const timerTickSecondRef = useRef<number | null>(null);
   const [snapshot, setSnapshot] = useState(gameRef.current);
   const [saveData, setSaveData] = useState<GameSaveData>(saveSession?.initialSaveData || createDefaultSaveData());
   const [saveMessage, setSaveMessage] = useState(saveSession ? 'Cloud save ready' : '');
@@ -719,6 +720,16 @@ function GameApp({
       const dt = Math.min(0.033, (now - last) / 1000);
       lastRef.current = now;
       updateGame(gameRef.current, dt, inputVector);
+      const game = gameRef.current;
+      const warningSecond = Math.ceil(Math.max(0, game.stageDuration - game.stageTime));
+      if (game.status === 'running' && warningSecond > 0 && warningSecond <= 10) {
+        if (timerTickSecondRef.current !== warningSecond) {
+          timerTickSecondRef.current = warningSecond;
+          playSound('tick');
+        }
+      } else {
+        timerTickSecondRef.current = null;
+      }
       if (gameRef.current.status === 'gameover' && !savedGameOverRef.current) {
         savedGameOverRef.current = true;
         const nextSaveData = recordRun(saveData, {
@@ -925,7 +936,7 @@ function GameApp({
   };
 
   const remainingStageTime = Math.max(0, snapshot.stageDuration - snapshot.stageTime);
-  const isTimerWarning = snapshot.status === 'running' && remainingStageTime <= 5;
+  const isTimerWarning = snapshot.status === 'running' && remainingStageTime <= 10;
   const currentHp = Math.max(0, Math.ceil(snapshot.player.hp));
   const maxHp = Math.ceil(snapshot.player.maxHp);
 
@@ -979,31 +990,29 @@ function GameApp({
         {snapshot.status !== 'lounge' && (
           <>
             <div className={`stage-timer ${isTimerWarning ? 'timer-warning' : ''}`}>{formatTime(remainingStageTime)}</div>
-            <div className="hud top">
-              <div className="health-readout">
-                <strong>{currentHp} / {maxHp}</strong>
+            <div className="hud top status-panel">
+              <div className="stage-readout">
+                <span>Stage</span>
+                <strong>{snapshot.stage}</strong>
               </div>
-              <div>
-                <strong>Stage {snapshot.stage}</strong>
+              <div className="health-readout">
+                <span>HP</span>
+                <strong>{currentHp} / {maxHp}</strong>
               </div>
               <div className="gem-readout">
                 <img src="assets/images/items/gems/xp-gem-small.png" alt="" />
                 <strong>{snapshot.player.gemsCollected}</strong>
               </div>
+              <button
+                className="hud-control-button"
+                onClick={snapshot.status === 'running' ? togglePause : start}
+                disabled={snapshot.status === 'lounge' || snapshot.status === 'stageClear'}
+                aria-label={snapshot.status === 'running' ? '일시정지' : '시작'}
+              >
+                {snapshot.status === 'running' ? <Pause size={18} /> : <Play size={18} />}
+              </button>
             </div>
           </>
-        )}
-
-        {snapshot.status !== 'lounge' && (
-          <div className="controls">
-            <button
-              onClick={snapshot.status === 'running' ? togglePause : start}
-              disabled={snapshot.status === 'lounge' || snapshot.status === 'stageClear'}
-              aria-label={snapshot.status === 'running' ? '일시정지' : '시작'}
-            >
-              {snapshot.status === 'running' ? <Pause size={20} /> : <Play size={20} />}
-            </button>
-          </div>
         )}
 
         {(snapshot.status === 'levelup' || snapshot.status === 'lounge') && (

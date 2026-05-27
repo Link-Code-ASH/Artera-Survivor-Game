@@ -1,4 +1,4 @@
-type SoundName = 'shoot' | 'hit' | 'pickup' | 'levelup' | 'gameover' | 'select' | 'button' | 'slide';
+type SoundName = 'shoot' | 'hit' | 'pickup' | 'levelup' | 'gameover' | 'select' | 'button' | 'slide' | 'tick';
 
 let audioContext: AudioContext | null = null;
 let enabled = false;
@@ -134,5 +134,10 @@ export function playSound(name: SoundName) {
     tone(260, 0.08, 'triangle', 0.026, 0, 420, -0.12);
     tone(740, 0.09, 'sine', 0.024, 0.035, 520, 0.12);
     noise(0.06, 0.01, 0.01, 1400);
+  }
+
+  if (name === 'tick') {
+    tone(960, 0.035, 'square', 0.03, 0, 720);
+    tone(420, 0.04, 'triangle', 0.018, 0.018, 360);
   }
 }

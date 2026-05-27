@@ -21,7 +21,7 @@ The main loop is:
 
 ## Stage Structure
 - The game should use fixed stages instead of one endless timer.
-- The current first-pass stage duration is 15 seconds.
+- The current stage duration is 60 seconds.
 - Stage maps should have a limited size instead of behaving like an infinite world.
 - Stage 1 is the baseline monster-count reference.
 - Each new stage should spawn about 5% more monsters than the previous stage.
@@ -43,10 +43,10 @@ The main loop is:
 - Player stats include HP, speed, damage, fire rate, projectile speed, projectile count, pierce, magnet range, knockback, and damage taken multiplier.
 - Character selection is portrait-first and uses a simple two-column card grid. Characters should be selected directly from the visible list instead of through a draggable carousel.
 - Weapon selection follows the same portrait-first two-column card grid pattern, with weapons selected directly from the visible list.
-- The combat HUD shows HP, stage, collected gems, and pause/start. HP is shown as `current / max`, gem count uses the XP gem icon, and helper labels stay hidden.
-- The timer should be more readable than the framed status chips: show it as a larger unframed number one row below the very top edge.
+- The combat HUD groups Stage, HP, collected gems, and pause/start into one compact centered top status panel instead of separate framed chips. Each status item should read horizontally with the label or icon on the left and the number on the right. HUD numbers should use a slightly italic fantasy-style treatment and sit on the visual centerline of the frame, not the mathematical box center. HP is shown as `current / max`, and gem count uses the XP gem icon.
+- The timer should be more readable than the status panel: show it as a larger unframed number at the top center, slightly below the other HUD frame.
 - The fullscreen control is not needed in combat because the title start flow already requests fullscreen.
-- When the stage timer reaches the final 5 seconds, the remaining-time number turns red and shakes lightly.
+- When the stage timer reaches the final 10 seconds, the remaining-time number turns red, shakes lightly, and plays a short tick once per second.
 - The waiting room should hide combat-only HUD elements, including remaining time, stage, HP, and run control buttons.
 
 ## Combat

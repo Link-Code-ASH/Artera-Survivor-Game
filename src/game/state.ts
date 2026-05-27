@@ -10,7 +10,7 @@ export function newGame(width = 960, height = 540, character: CharacterDefinitio
     time: 0,
     stage: 1,
     stageTime: 0,
-    stageDuration: 15,
+    stageDuration: 60,
     stageClearTimer: 0,
     mapWidth: 1360,
     mapHeight: 1870,

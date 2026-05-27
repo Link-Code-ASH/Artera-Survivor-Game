@@ -33,7 +33,7 @@ The user may later refine:
 - Add more specialized docs only when the project needs them.
 - Likely future docs: `save-system.md`, `ui-flow.md`, `assets.md`, and `balance.md`.
 - Upgrade choices now have category badges: common, ranged-only, melee-only, and utility.
-- The game direction is now stage-based like Brotato: each stage lasts about 15 seconds, then the player purchases an ability with collected XP gems in a waiting-room flow before the next stage.
+- The game direction is now stage-based like Brotato: each stage lasts about 60 seconds, then the player purchases an ability with collected XP gems in a waiting-room flow before the next stage.
 - Code structure has started moving away from one large `src/main.tsx`: content now lives in `src/content/`, shared types and gameplay systems live in `src/game/`.
 - Waiting-room upgrade choices now need a reroll flow: spend gems to redraw choices, with the cost increasing by 1 per reroll during the same visit.
 - Stage maps are now bounded rather than infinite. Starting a new stage restores HP to full, and waiting-room upgrades can be purchased multiple times before manually continuing.
