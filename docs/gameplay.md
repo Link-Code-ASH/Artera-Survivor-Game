@@ -43,7 +43,9 @@ The main loop is:
 - Player stats include HP, speed, damage, fire rate, projectile speed, projectile count, pierce, magnet range, knockback, and damage taken multiplier.
 - Character selection is portrait-first and uses a simple two-column card grid. Characters should be selected directly from the visible list instead of through a draggable carousel.
 - Weapon selection follows the same portrait-first two-column card grid pattern, with weapons selected directly from the visible list.
-- The combat HUD shows six top-row frames: HP, stage, collected gems, timer, pause/start, and fullscreen. HP is shown as `current / max`, gem count uses the XP gem icon, and helper labels stay hidden.
+- The combat HUD shows HP, stage, collected gems, and pause/start. HP is shown as `current / max`, gem count uses the XP gem icon, and helper labels stay hidden.
+- The timer should be more readable than the framed status chips: show it as a larger unframed number one row below the very top edge.
+- The fullscreen control is not needed in combat because the title start flow already requests fullscreen.
 - When the stage timer reaches the final 5 seconds, the remaining-time number turns red and shakes lightly.
 - The waiting room should hide combat-only HUD elements, including remaining time, stage, HP, and run control buttons.
 
@@ -54,6 +56,7 @@ The main loop is:
 - Projectiles can pierce additional enemies depending on player pierce.
 - Hits apply damage and knockback.
 - Upgrade effects can extend combat with longer projectile range, splash damage on enemy defeat, slow on hit, contact reflection damage, damage over time, homing projectile steering, and a chance for gem pickups to count double.
+- Enemies affected by damage over time should show a temporary visual status marker. The current marker is a code-drawn placeholder until a dedicated asset is added.
 
 ## Enemies
 - Enemies spawn just outside the camera view.

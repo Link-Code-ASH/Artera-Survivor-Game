@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { Maximize, Pause, Play } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 import {
   createDefaultSaveData,
   loadGameSave,
@@ -18,7 +18,7 @@ import { getCamera, getWorldView } from './game/camera';
 import { clamp, len, norm, seededNoise } from './game/math';
 import { newGame } from './game/state';
 import { applyUpgrade, rerollUpgrades, startNextStage, updateGame } from './game/systems';
-import type { Bullet, CharacterDefinition, Direction, Enemy, GameState, Gem, Upgrade, Vec, WeaponDefinition } from './game/types';
+import type { Bullet, CharacterDefinition, Direction, Enemy, GameState, Gem, Upgrade, UpgradeCategory, Vec, WeaponDefinition } from './game/types';
 import './styles.css';
 
 const keys = new Set<string>();
@@ -424,6 +424,7 @@ function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy, game: GameState)
       drawWidth,
       drawHeight,
     );
+    drawEnemyStatusEffects(ctx, enemy, game);
     return;
   }
 
@@ -452,6 +453,7 @@ function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy, game: GameState)
       drawWidth,
       drawHeight,
     );
+    drawEnemyStatusEffects(ctx, enemy, game);
     return;
   }
 
@@ -464,6 +466,27 @@ function drawEnemy(ctx: CanvasRenderingContext2D, enemy: Enemy, game: GameState)
   ctx.arc(enemy.x - 4, enemy.y - 2, 2, 0, Math.PI * 2);
   ctx.arc(enemy.x + 5, enemy.y - 2, 2, 0, Math.PI * 2);
   ctx.fill();
+  drawEnemyStatusEffects(ctx, enemy, game);
+}
+
+function drawEnemyStatusEffects(ctx: CanvasRenderingContext2D, enemy: Enemy, game: GameState) {
+  if (enemy.dotTimer <= 0 || enemy.dotDamage <= 0) return;
+
+  const pulse = 0.55 + Math.sin(game.time * 14 + enemy.id) * 0.18;
+  ctx.save();
+  ctx.globalAlpha = clamp(pulse, 0.32, 0.82);
+  ctx.strokeStyle = '#ff7a38';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(enemy.x, enemy.y - enemy.r - 12, 8, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#ffb15f';
+  ctx.beginPath();
+  ctx.moveTo(enemy.x, enemy.y - enemy.r - 23);
+  ctx.quadraticCurveTo(enemy.x + 8, enemy.y - enemy.r - 12, enemy.x, enemy.y - enemy.r - 5);
+  ctx.quadraticCurveTo(enemy.x - 7, enemy.y - enemy.r - 12, enemy.x, enemy.y - enemy.r - 23);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
@@ -565,6 +588,13 @@ function formatTime(seconds: number) {
   const m = Math.floor(seconds / 60).toString();
   const s = Math.floor(seconds % 60).toString().padStart(2, '0');
   return `${m}:${s}`;
+}
+
+function upgradeCategoryLabel(category: UpgradeCategory) {
+  if (category === 'rangedOnly') return '원거리';
+  if (category === 'meleeOnly') return '근거리';
+  if (category === 'utility') return '유틸';
+  return '공통';
 }
 
 type SaveSession = {
@@ -948,6 +978,7 @@ function GameApp({
 
         {snapshot.status !== 'lounge' && (
           <>
+            <div className={`stage-timer ${isTimerWarning ? 'timer-warning' : ''}`}>{formatTime(remainingStageTime)}</div>
             <div className="hud top">
               <div className="health-readout">
                 <strong>{currentHp} / {maxHp}</strong>
@@ -958,9 +989,6 @@ function GameApp({
               <div className="gem-readout">
                 <img src="assets/images/items/gems/xp-gem-small.png" alt="" />
                 <strong>{snapshot.player.gemsCollected}</strong>
-              </div>
-              <div>
-                <strong className={isTimerWarning ? 'timer-warning' : undefined}>{formatTime(remainingStageTime)}</strong>
               </div>
             </div>
           </>
@@ -974,16 +1002,6 @@ function GameApp({
               aria-label={snapshot.status === 'running' ? '일시정지' : '시작'}
             >
               {snapshot.status === 'running' ? <Pause size={20} /> : <Play size={20} />}
-            </button>
-            <button
-              onClick={() => {
-                unlockAudio();
-                playSound('button');
-                requestFullScreen();
-              }}
-              aria-label="전체화면"
-            >
-              <Maximize size={20} />
             </button>
           </div>
         )}
@@ -1007,9 +1025,11 @@ function GameApp({
                   <button
                     key={upgrade.id}
                     data-upgrade={upgrade.id}
+                    data-category={upgrade.category}
                     disabled={snapshot.status === 'lounge' && snapshot.player.upgradeCurrency < upgrade.cost}
                     onClick={() => chooseUpgrade(upgrade)}
                   >
+                    <b className="upgrade-category">{upgradeCategoryLabel(upgrade.category)}</b>
                     <strong>{upgrade.title}</strong>
                     <span>{upgrade.body}</span>
                     {snapshot.status === 'lounge' && (

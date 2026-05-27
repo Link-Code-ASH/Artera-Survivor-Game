@@ -39,11 +39,14 @@ export type Upgrade = {
   id: string;
   familyId: string;
   tier: number;
+  category: UpgradeCategory;
   title: string;
   body: string;
   cost: number;
   apply: (game: GameState) => void;
 };
+
+export type UpgradeCategory = 'common' | 'rangedOnly' | 'meleeOnly' | 'utility';
 
 export type CharacterDefinition = {
   id: string;

@@ -93,7 +93,7 @@ Current upgrade families:
 - `double-gem`: `탐욕의 별잔`, chance for collected gems to count double.
 
 ## Upgrade Pool Structure
-Upgrades should be organized by weapon category so future weapons can share some choices while also having category-specific choices.
+Upgrades have a category field so future weapons can share some choices while also having category-specific choices. Cards currently display this category as a small badge.
 
 Weapon categories:
 - `ranged`: Weapons that attack from a distance with projectiles or beams.
@@ -103,16 +103,20 @@ Upgrade pools:
 - `common`: Can appear for any weapon category.
 - `rangedOnly`: Can appear only when the selected weapon is in the `ranged` category.
 - `meleeOnly`: Can appear only when the selected weapon is in the `melee` category.
+- `utility`: Movement, economy, pickup, or control upgrades that are not tied to one attack style.
 
 Current weapon category:
 - `magic-staff`: `ranged`
 
 Suggested common upgrade types:
 - Max HP increase.
-- Movement speed increase.
-- Magnet range increase.
 - Damage taken reduction.
 - General damage increase if it can apply cleanly to all weapon categories.
+
+Suggested utility upgrade types:
+- Movement speed increase.
+- Magnet range increase.
+- Slows, economy bonuses, pickup bonuses, reroll support, and other non-weapon-specific systems.
 
 Suggested ranged-only upgrade types:
 - Projectile count increase.

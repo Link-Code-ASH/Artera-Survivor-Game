@@ -224,13 +224,13 @@ input {
   position: absolute;
   z-index: 3;
   display: flex;
-  max-width: calc(100% - 120px);
+  max-width: calc(100% - 72px);
   gap: 3px;
   pointer-events: none;
 }
 
 .hud.top {
-  top: 12px;
+  top: 58px;
   left: 12px;
 }
 
@@ -255,6 +255,22 @@ input {
   font-size: clamp(11px, 2.8vw, 15px);
   line-height: 1.1;
   white-space: nowrap;
+}
+
+.stage-timer {
+  position: absolute;
+  z-index: 3;
+  top: 18px;
+  left: 16px;
+  color: #fff6df;
+  font-size: clamp(34px, 9.6vw, 58px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: 0;
+  text-shadow:
+    0 4px 0 rgba(42, 23, 9, 0.85),
+    0 10px 18px rgba(0, 0, 0, 0.56);
+  pointer-events: none;
 }
 
 .timer-warning {
@@ -331,7 +347,7 @@ input {
 
 .health-readout {
   display: grid;
-  width: clamp(82px, 20vw, 108px);
+  width: clamp(114px, 30vw, 148px);
   min-width: 0;
   min-height: 42px;
   align-content: center;
@@ -346,7 +362,7 @@ input {
 }
 
 .health-readout strong {
-  font-size: clamp(10px, 2.7vw, 14px);
+  font-size: clamp(10px, 2.55vw, 14px);
   line-height: 1.1;
   white-space: nowrap;
 }
@@ -2269,10 +2285,40 @@ input {
 
 .lounge-layer .upgrade-list strong,
 .lounge-layer .upgrade-list span,
-.lounge-layer .upgrade-list small {
+.lounge-layer .upgrade-list small,
+.lounge-layer .upgrade-list .upgrade-category {
   position: absolute;
   display: block;
   text-align: center;
+}
+
+.lounge-layer .upgrade-list .upgrade-category {
+  top: 9%;
+  left: 50%;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 232, 173, 0.28);
+  border-radius: 999px;
+  background: rgba(18, 11, 25, 0.62);
+  color: rgba(255, 232, 173, 0.86);
+  font-size: clamp(10px, 2.7vw, 12px);
+  font-style: normal;
+  line-height: 1;
+  transform: translateX(-50%);
+}
+
+.lounge-layer .upgrade-list button[data-category="rangedOnly"] .upgrade-category {
+  border-color: rgba(126, 210, 255, 0.42);
+  color: #bfeaff;
+}
+
+.lounge-layer .upgrade-list button[data-category="meleeOnly"] .upgrade-category {
+  border-color: rgba(255, 156, 113, 0.42);
+  color: #ffc2a2;
+}
+
+.lounge-layer .upgrade-list button[data-category="utility"] .upgrade-category {
+  border-color: rgba(155, 255, 189, 0.38);
+  color: #c9ffd9;
 }
 
 .lounge-layer .upgrade-list strong {
@@ -2422,7 +2468,7 @@ input {
 
   .hud.top {
     flex-wrap: wrap;
-    max-width: calc(100% - 112px);
+    max-width: calc(100% - 72px);
   }
 
   .hud div {
@@ -2431,7 +2477,15 @@ input {
   }
 
   .hud strong {
-    font-size: 15px;
+    font-size: 14px;
+  }
+
+  .health-readout {
+    width: clamp(132px, 38vw, 168px);
+  }
+
+  .health-readout strong {
+    font-size: clamp(11px, 3.2vw, 14px);
   }
 
   .upgrade-list {

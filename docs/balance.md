@@ -58,8 +58,8 @@ Keep first-pass values easy to tune. Exact numbers can be adjusted after testing
 | Stage duration | `30` seconds | First-pass value for the Brotato-style stage structure. |
 | Stage timer | `0` | Resets when the next stage starts. |
 | Stage clear pause | `1.2` seconds | Short delay before the waiting room appears. |
-| Map width | `2200` | First-pass bounded stage arena width. |
-| Map height | `1600` | First-pass bounded stage arena height. |
+| Map width | `1360` | Portrait-first bounded stage arena width. |
+| Map height | `1870` | Portrait-first bounded stage arena height. |
 | Stage transition HP | Full restore | HP is restored to max HP when starting the next stage. |
 
 Stage difficulty currently scales from stage number and time inside the current stage. Exact stage length, enemy scaling, rewards, and recovery rules can be tuned after testing.
@@ -151,8 +151,8 @@ Use this section as the baseline when the user asks to raise, lower, speed up, s
 | Value | Current Value | Code Location | Notes |
 | --- | ---: | --- | --- |
 | Stage duration | `30` seconds | `src/game/state.ts` | Current first-pass stage length. |
-| Map width | `2200` | `src/game/state.ts` | Bounded arena width. |
-| Map height | `1600` | `src/game/state.ts` | Bounded arena height. |
+| Map width | `1360` | `src/game/state.ts` | Bounded portrait arena width. |
+| Map height | `1870` | `src/game/state.ts` | Bounded portrait arena height. |
 | Spawn margin | `90` | `src/game/systems.ts` | Spawn attempt is just outside the camera view. |
 | Minimum spawn delay | `0.16` seconds | `src/game/systems.ts` | Spawn delay cannot go below this. |
 | Stage 1 spawn amount | `100%` current baseline | `src/game/systems.ts` | This is the baseline for future spawn-count requests. |

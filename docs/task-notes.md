@@ -32,7 +32,7 @@ The user may later refine:
 - Keep `AGENTS.md` as the project entry point.
 - Add more specialized docs only when the project needs them.
 - Likely future docs: `save-system.md`, `ui-flow.md`, `assets.md`, and `balance.md`.
-- Upgrade choices should be refactored into weapon-category pools: common, ranged-only, and melee-only.
+- Upgrade choices now have category badges: common, ranged-only, melee-only, and utility.
 - The game direction is now stage-based like Brotato: each stage lasts about 30 seconds, then the player purchases an ability with collected XP gems in a waiting-room flow before the next stage.
 - Code structure has started moving away from one large `src/main.tsx`: content now lives in `src/content/`, shared types and gameplay systems live in `src/game/`.
 - Waiting-room upgrade choices now need a reroll flow: spend gems to redraw choices, with the cost increasing by 1 per reroll during the same visit.
