@@ -21,7 +21,7 @@ The main loop is:
 
 ## Stage Structure
 - The game should use fixed stages instead of one endless timer.
-- The current first-pass stage duration is 30 seconds.
+- The current first-pass stage duration is 15 seconds.
 - Stage maps should have a limited size instead of behaving like an infinite world.
 - Stage 1 is the baseline monster-count reference.
 - Each new stage should spawn about 5% more monsters than the previous stage.
