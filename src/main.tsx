@@ -33,8 +33,12 @@ type JoystickState = {
   knobY: number;
 };
 
-const caidenAtlas = new Image();
-caidenAtlas.src = 'assets/images/characters/caiden-4dir.png';
+const caidenWalkDownAtlas = new Image();
+caidenWalkDownAtlas.src = 'assets/images/characters/caiden-walk-down-8f.png';
+const caidenWalkLeftAtlas = new Image();
+caidenWalkLeftAtlas.src = 'assets/images/characters/caiden-walk-left-8f.png';
+const caidenWalkUpAtlas = new Image();
+caidenWalkUpAtlas.src = 'assets/images/characters/caiden-walk-up-8f.png';
 const caidenPortrait = new Image();
 caidenPortrait.src = 'assets/images/characters/caiden-portrait.png';
 const magicStaffIcon = new Image();
@@ -51,6 +55,50 @@ const forestGoblinAtlas = new Image();
 forestGoblinAtlas.src = 'assets/images/enemies/forest-goblin-2dir.png';
 const xpGemImage = new Image();
 xpGemImage.src = 'assets/images/items/gems/xp-gem-small.png';
+
+type SpriteFrame = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  centerX: number;
+  bottom: number;
+};
+
+const caidenWalkFrames: Record<Direction, SpriteFrame[]> = {
+  down: [
+    { x: 73, y: 112, w: 240, h: 382, centerX: 192.5, bottom: 493 },
+    { x: 335, y: 109, w: 270, h: 381, centerX: 469.5, bottom: 489 },
+    { x: 648, y: 114, w: 270, h: 380, centerX: 783, bottom: 493 },
+    { x: 962, y: 109, w: 270, h: 379, centerX: 1096.5, bottom: 487 },
+    { x: 1270, y: 111, w: 270, h: 384, centerX: 1404.5, bottom: 494 },
+    { x: 1589, y: 107, w: 269, h: 385, centerX: 1723, bottom: 491 },
+    { x: 1906, y: 112, w: 270, h: 381, centerX: 2040.5, bottom: 492 },
+    { x: 2194, y: 109, w: 255, h: 383, centerX: 2321, bottom: 491 },
+  ],
+  left: [
+    { x: 69, y: 137, w: 244, h: 371, centerX: 190.5, bottom: 507 },
+    { x: 335, y: 137, w: 270, h: 371, centerX: 469.5, bottom: 507 },
+    { x: 648, y: 137, w: 270, h: 371, centerX: 783, bottom: 507 },
+    { x: 962, y: 137, w: 270, h: 371, centerX: 1096.5, bottom: 507 },
+    { x: 1269, y: 137, w: 270, h: 373, centerX: 1403.5, bottom: 509 },
+    { x: 1586, y: 137, w: 270, h: 371, centerX: 1720.5, bottom: 507 },
+    { x: 1915, y: 137, w: 247, h: 372, centerX: 2038, bottom: 508 },
+    { x: 2205, y: 137, w: 262, h: 371, centerX: 2335.5, bottom: 507 },
+  ],
+  right: [],
+  up: [
+    { x: 59, y: 134, w: 234, h: 383, centerX: 175.5, bottom: 516 },
+    { x: 365, y: 133, w: 245, h: 385, centerX: 487, bottom: 517 },
+    { x: 686, y: 133, w: 235, h: 387, centerX: 803, bottom: 519 },
+    { x: 993, y: 133, w: 244, h: 389, centerX: 1114.5, bottom: 521 },
+    { x: 1314, y: 132, w: 237, h: 390, centerX: 1432, bottom: 521 },
+    { x: 1620, y: 132, w: 245, h: 390, centerX: 1742, bottom: 521 },
+    { x: 1942, y: 132, w: 237, h: 386, centerX: 2060, bottom: 517 },
+    { x: 2247, y: 133, w: 242, h: 389, centerX: 2367.5, bottom: 521 },
+  ],
+};
+caidenWalkFrames.right = caidenWalkFrames.left;
 
 function requestFullScreen() {
   const root = document.documentElement;
@@ -491,25 +539,27 @@ function drawEnemyStatusEffects(ctx: CanvasRenderingContext2D, enemy: Enemy, gam
 
 function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
   const p = game.player;
-  if (caidenAtlas.complete && caidenAtlas.naturalWidth > 0) {
-    const columns = 4;
-    const rows = 4;
-    const sourceWidth = caidenAtlas.naturalWidth / columns;
-    const sourceHeight = caidenAtlas.naturalHeight / rows;
-    const frame = p.moving ? Math.floor(game.time * 8) % 4 : 0;
-    const rowByDirection: Record<Direction, number> = {
-      down: 0,
-      left: 1,
-      right: 1,
-      up: 3,
-    };
-    const row = rowByDirection[p.facing];
-    const sourceX = Math.floor(frame * sourceWidth);
-    const sourceY = Math.floor(row * sourceHeight);
+  const atlasByDirection: Record<Direction, HTMLImageElement> = {
+    down: caidenWalkDownAtlas,
+    left: caidenWalkLeftAtlas,
+    right: caidenWalkLeftAtlas,
+    up: caidenWalkUpAtlas,
+  };
+  const atlas = atlasByDirection[p.facing];
+
+  if (atlas.complete && atlas.naturalWidth > 0) {
+    const columns = 8;
+    const frame = p.moving ? Math.floor(game.time * 10) % columns : 0;
+    const spriteFrame = caidenWalkFrames[p.facing][frame];
+    const sourceHeight = atlas.naturalHeight;
     const heroScale = 1.56;
-    const drawWidth = 74 * heroScale;
-    const drawHeight = (p.facing === 'up' ? 86 : 74) * heroScale;
-    const drawY = p.y - drawHeight * (p.facing === 'up' ? 0.48 : 0.68);
+    const drawHeight = 122 * heroScale;
+    const sourceScale = drawHeight / sourceHeight;
+    const drawWidth = spriteFrame.w * sourceScale;
+    const croppedCenter = spriteFrame.centerX - spriteFrame.x;
+    const visualBottomY = p.y + (p.facing === 'up' ? 44 : 40);
+    const drawY = visualBottomY - (spriteFrame.bottom - spriteFrame.y) * sourceScale;
+    const drawX = -croppedCenter * sourceScale;
 
     ctx.save();
     ctx.translate(p.x, drawY);
@@ -518,15 +568,15 @@ function drawHero(ctx: CanvasRenderingContext2D, game: GameState) {
     }
     try {
       ctx.drawImage(
-        caidenAtlas,
-        sourceX,
-        sourceY,
-        Math.ceil(sourceWidth),
-        Math.ceil(sourceHeight),
-        -drawWidth / 2,
+        atlas,
+        spriteFrame.x,
+        spriteFrame.y,
+        spriteFrame.w,
+        spriteFrame.h,
+        drawX,
         0,
         drawWidth,
-        drawHeight,
+        spriteFrame.h * sourceScale,
       );
     } catch {
       ctx.restore();

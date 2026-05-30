@@ -14,6 +14,8 @@ Characters are defined in `src/content/characters.ts` as `CharacterDefinition`.
 Current character:
 - `caiden`: Default playable character.
 
+Current Caiden in-game movement art uses separate 8-frame walk atlases for `down`, `left`, and `up`. The `right` direction mirrors the left-facing atlas.
+
 When adding a character, update:
 - Character definition list.
 - Save defaults and unlocks if the character should be selectable.

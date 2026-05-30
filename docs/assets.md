@@ -28,6 +28,18 @@ Example:
 | Ability reroll button | `public/assets/images/ui/button/btn-select-ability.png` | `assets/images/ui/button/btn-select-ability.png` | Waiting room reroll button. |
 | Next stage button | `public/assets/images/ui/button/btn-select-next-stage.png` | `assets/images/ui/button/btn-select-next-stage.png` | Waiting room next-stage button. |
 
+## Character Assets
+
+| Asset | File Path | Runtime Path | Used For |
+| --- | --- | --- | --- |
+| Caiden portrait | `public/assets/images/characters/caiden-portrait.png` | `assets/images/characters/caiden-portrait.png` | Character and selected-character UI portrait. |
+| Caiden walk down | `public/assets/images/characters/caiden-walk-down-8f.png` | `assets/images/characters/caiden-walk-down-8f.png` | In-game down-facing 8-frame walk animation. |
+| Caiden walk left | `public/assets/images/characters/caiden-walk-left-8f.png` | `assets/images/characters/caiden-walk-left-8f.png` | In-game left-facing 8-frame walk animation; right-facing movement mirrors this image. |
+| Caiden walk up | `public/assets/images/characters/caiden-walk-up-8f.png` | `assets/images/characters/caiden-walk-up-8f.png` | In-game up-facing 8-frame walk animation. |
+
+Notes:
+- Caiden walk frames are cropped and center-corrected in `src/main.tsx` so uneven transparent padding does not show neighboring frames or make the character snap left or right while animating.
+
 ## Enemy Assets
 
 | Asset | File Path | Runtime Path | Used For |
